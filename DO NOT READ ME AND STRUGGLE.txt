@@ -1,0 +1,29 @@
+Stuff you need to reference in your IDE : (Probably won't need all of them for simple modding, but it doesn't hurt to have them all ready.)
+您需要在 IDE 中引用的内容: (可能不需要所有这些内容来进行简单的修改，但是将它们全部准备好也没有坏处。)
+Rain World/BepInEx/core - Every .dll file
+Rain World/BepInEx/utils - PUBLIC-Assembly-CSharp.dll
+Rain World/BepInEx/plugins - HOOKS-Assembly-CSharp.dll
+Rain World/RainWorld_Data/Managed - Assembly-CSharp-firstpass.dll, com.rlabrecque.steamworks.net.dll, 
+UnityEngine.dll, UnityEngine.CoreModule.dll, UnityEngine.InputLegacyModule.dll, UnityEngine.ImageConversionModule.dll,
+GoKit.dll, Newtonsoft.Json.dll
+
+
+Throw your TemplateMod folder into:
+将您的模板模块文件夹放入:
+Rain World/RainWorld_Data/StreamingAssets/mods
+
+When developing mods, it’s recommended to disable other unrelated mods first.
+开发模组时，建议先禁用其他无关的模组。
+
+When writing mods, logging is your best friend.
+写mods的时候，日志是你最好的朋友。
+Rain World/BepInEx/LogOutput.txt - for exceptions, loading fails and your own Logger.LogInfo/Logger.LogError messages.
+对于异常，加载失败和您自己的 Logger.LogInfo/Logger.LogError 消息。
+Rain World/consoleLog.txt - for your own Debug.Log messages. You can access console log in-game by enabling Dev Tools and pressing 'K'
+您可以通过启用开发工具并按“ K”来访问游戏中的控制台日志，供您自己调试，记录消息。
+Rain World/exceptionLog.txt* - for exceptions; *Doesn't catch everything + obsolete if using a try-catch (look next step)
+对于例外; * 如果使用try-catch，则不会捕获所有过时的内容 (请看下一步)
+
+It's also a good idea to have a try-catch around RainWorld.Update while writing a mod - but instead of doing it for every mod (and later removing it when shipping it), you can use one ready for you :
+这也是一个好主意，在编写mod时尝试捕捉 (Rain World.Update) 也是一个好主意-但不要为每个mod都这样做(然后在发布时删除它)，你可以使用一个现成的 mod:
+https://steamcommunity.com/sharedfiles/filedetails/?id=2927326990

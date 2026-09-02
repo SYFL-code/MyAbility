@@ -1,0 +1,128 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
+	<PropertyGroup>
+		<TargetFramework>net48</TargetFramework>
+		<LangVersion>13</LangVersion>
+		<Nullable>enable</Nullable>
+		<Deterministic>true</Deterministic>
+		<DeterministicSourcePaths>false</DeterministicSourcePaths>
+		<DefineConstants>MYSLUGCAT</DefineConstants>
+	</PropertyGroup>
+	
+	
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<DebugType>portable</DebugType>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<PathMap>$(MSBuildProjectDirectory)=/$(SolutionName)</PathMap>
+		<DebugType>none</DebugType>
+	</PropertyGroup>
+
+
+	<PropertyGroup>
+		<!-- 如果环境变量未设置，则使用硬编码默认路径（请根据实际情况修改） -->
+		<RainWorldDir Condition="'$(RainWorldDir)' == ''">E:/SteamLibrary/steamapps/common/Rain World</RainWorldDir>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- 0. CommonUtils 共享文件 -->
+		<Compile Include="../../CommonUtils/src/**/*.cs" Exclude="../../CommonUtils/src/obj/**/*.cs ; ../../CommonUtils/src/bin/**/*.cs">
+			<Link>CommonUtils/%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</Compile>
+	
+		<!-- 1. 项目本地库 -->
+		<Reference Include="../../CommonUtils/lib/*.dll" Exclude="../../CommonUtils/lib/Newtonsoft.Json.dll">
+			<Private>false</Private>
+		</Reference>
+
+		<Reference Include="../../CommonUtils/lib/Newtonsoft.Json.dll">
+			<Private>false</Private>
+		</Reference>
+		
+		<!-- 2. Managed 包 -->
+		<Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/Assembly-CSharp-firstpass.dll">
+			<Private>false</Private>
+		</Reference>
+		
+		<Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/GoKit.dll">
+			<Private>false</Private>
+		</Reference>
+
+		<Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/com.playeveryware.eos-Editor.steam.utility.dll">
+			<Private>false</Private>
+		</Reference>
+
+		<Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/com.rlabrecque.steamworks.net.dll">
+			<Private>false</Private>
+		</Reference>
+
+		<!-- 3. BepInEx 核心 -->
+		<Reference Include="$(RainWorldDir)/BepInEx/core/*.dll" Exclude="$(RainWorldDir)/BepInEx/core/0Harmony20.dll">
+		<Private>false</Private>
+		</Reference>
+
+		<Reference Include="$(RainWorldDir)/BepInEx/core/0Harmony20.dll" Aliases="Harmony20">
+			<Private>false</Private>
+		</Reference>
+
+		<!-- 4. BepInEx 插件（其他模组） -->
+		<Reference Include="$(RainWorldDir)/BepInEx/plugins/*.dll">
+		<Private>false</Private>
+		</Reference>
+
+		<!-- 5. BepInEx 工具库 -->
+		<Reference Include="$(RainWorldDir)/BepInEx/utils/*.dll">
+		<Private>false</Private>
+		</Reference>
+
+		<!-- 6. Unity 引擎 -->
+		<Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/Unity*.dll">
+		<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+
+	<ItemGroup>
+	  <PackageReference Include="PolySharp" Version="1.15.0">
+		<PrivateAssets>all</PrivateAssets>
+		<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	  </PackageReference>
+	</ItemGroup>
+
+	
+	<!-- 生成时排除 Debug 目录下的所有文件 -->
+	<ItemGroup>
+	  <Compile Remove="Debug\**" />
+	  <EmbeddedResource Remove="Debug\**" />
+	  <None Remove="Debug\**" />
+	  <Reference Remove="Debug\**" />
+	</ItemGroup>
+
+	<Target Name="GenerateMod" AfterTargets="PostBuildEvent">
+		<ItemGroup>
+			<RemovePlugins Include="../mod/newest/plugins/*.*" />
+			<RemovePlugins Include="../mod/plugins/*.*" />
+		</ItemGroup>
+		
+		<ItemGroup>
+			<CopyPlugins Include="$(TargetPath)" />
+			<CopyPlugins Include="../../CommonUtils/lib/Newtonsoft.Json.dll" />
+			<!-- 只在 Debug 时复制 PDB -->
+			<CopyPlugins Condition="'$(Configuration)' == 'Debug'" Include="$(TargetDir)$(TargetName).pdb" />
+		</ItemGroup>
+		
+		<Delete Files="@(RemovePlugins)" />
+		
+		<!-- 复制到 newest -->
+		<Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/newest/plugins/" />
+		<!-- Release 时额外清理 PDB -->
+		<Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/newest/plugins/*.pdb" />
+
+		<!-- 复制到 plugins -->
+		<Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/plugins/" />
+		<!-- Release 时额外清理 PDB -->
+		<Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/plugins/*.pdb" />
+	</Target>
+	
+</Project>

@@ -1,0 +1,13 @@
+{
+  "id": "myslugcat.redlyn",
+  "name": "My Slugcat",
+  "version": "0.1.0",
+  "authors": "Redlyn",
+  "description": "My Slugcat",
+  "tags": [
+    "Custom Slugcat",
+    "Base",
+    "Downpour",
+    "Watcher"
+  ]
+}
