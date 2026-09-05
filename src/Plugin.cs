@@ -33,6 +33,7 @@ using System.Xml.Linq;
 using UnityEngine;
 using Watcher;
 using static PhysicalObject;
+using static RainWorld;
 
 namespace MySlugcat;
 [BepInPlugin(Plugin.GUID, Plugin.NAME, Plugin.VERSION)]
@@ -43,13 +44,16 @@ public sealed class Plugin : BaseUnityPlugin
 	public const string NAME = "My Slugcat";
 	public const string VERSION = "0.1.0";
 
-	public const string version = "v01";
+	//public const string version = "v01";
 	public const string Name = "MySlugcat";
-	#endregion
 
-	#region Release & DEBUG
+    public static string version = BuildInfo.Version;
+    public static string buildTime = BuildInfo.BuildTime;
+    #endregion
+
+    #region Release & DEBUG
 #if DEBUG
-	public static bool DebugMode { get; } = true;
+    public static bool DebugMode { get; } = true;
 	private static bool EnableStartScreen = true;
 	public static bool ForceLog { get; } = true;
 #else
@@ -70,10 +74,11 @@ public sealed class Plugin : BaseUnityPlugin
 		CommonUtils.Plugin.GUID = Plugin.GUID;
 		CommonUtils.Plugin.NAME = Plugin.NAME;
 		CommonUtils.Plugin.VERSION = Plugin.VERSION;
-		CommonUtils.Plugin.version = Plugin.version;
-		CommonUtils.Plugin.Name = Plugin.Name;
+        CommonUtils.Plugin.Name = Plugin.Name;
+        CommonUtils.Plugin.version = Plugin.version;
+        CommonUtils.Plugin.buildTime = Plugin.buildTime;
 
-		Log.LogDebug($"{Name} Mod Awake");
+        Log.LogDebug($"{Name} Mod Awake");
 	}
 	public void Start()
 	{
@@ -101,8 +106,10 @@ public sealed class Plugin : BaseUnityPlugin
 		On.RainWorld.OnModsEnabled += On_RainWorld_OnModsEnabled;
 		On.RainWorld.OnModsDisabled += On_RainWorld_OnModsDisabled;
 
-        PenetrationAbility.Hook();
-        FrameAbility.Hook();
+		//PenetrationAbility.Hook();
+		//FrameAbility.Hook();
+		//ArcLightningAbility.Hook();
+		Hooks.RegisterHooks();
 
         CommonUtils.Core.HookManager.Initialize();
 	}
@@ -122,8 +129,9 @@ public sealed class Plugin : BaseUnityPlugin
 		On.RainWorld.OnModsEnabled -= On_RainWorld_OnModsEnabled;
 		On.RainWorld.OnModsDisabled -= On_RainWorld_OnModsDisabled;
 
+		Hooks.RegisterHooks();
 
-		CommonUtils.Core.HookManager.UnInitializeAll();
+        CommonUtils.Core.HookManager.UnInitializeAll();
 	}
 
 

@@ -26,81 +26,8 @@ using static PhysicalObject;
 namespace MySlugcat.Ability
 {
 	// 穿透能力
-	internal static class PenetrationAbility
+	internal static class Penetration
 	{
-		public static void Hook()
-		{
-            // Update
-            HookManager.Register("On.Weapon.Update += Weapon_Update (Penetration)", new HookManager.HookData
-			{
-				Priority = 0,
-				InitializeHooks = () => On.Weapon.Update += Weapon_Update,
-				UnInitializeHooks = () => On.Weapon.Update -= Weapon_Update,
-			});
-
-            // Thrown
-            HookManager.Register("On.Weapon.Thrown += Weapon_Thrown (Penetration)", new HookManager.HookData
-			{
-				Priority = 0,
-				InitializeHooks = () => On.Weapon.Thrown += Weapon_Thrown,
-				UnInitializeHooks = () => On.Weapon.Thrown -= Weapon_Thrown,
-			});
-
-            // HitAnotherThrownWeapon
-            HookManager.Register("On.Weapon.HitAnotherThrownWeapon += Weapon_HitAnotherThrownWeapon (Penetration)", new HookManager.HookData
-			{
-				Priority = 0,
-				InitializeHooks = () => On.Weapon.HitAnotherThrownWeapon += Weapon_HitAnotherThrownWeapon,
-				UnInitializeHooks = () => On.Weapon.HitAnotherThrownWeapon -= Weapon_HitAnotherThrownWeapon,
-			});
-
-
-            // HitSomething
-            HookManager.Register("On.Weapon.HitSomething += PenetrateHit (Penetration)", new HookManager.HookData
-			{
-				Priority = 1,
-				InitializeHooks = () => On.Weapon.HitSomething += PenetrateHit,
-				UnInitializeHooks = () => On.Weapon.HitSomething -= PenetrateHit,
-			});
-			HookManager.Register("On.Spear.HitSomething += PenetrateHit (Penetration)", new HookManager.HookData
-			{
-				Priority = 1,
-				InitializeHooks = () => On.Spear.HitSomething += PenetrateHit,
-				UnInitializeHooks = () => On.Spear.HitSomething -= PenetrateHit,
-			});
-			HookManager.Register("On.Rock.HitSomething += PenetrateHit (Penetration)", new HookManager.HookData
-			{
-				Priority = 1,
-				InitializeHooks = () => On.Rock.HitSomething += PenetrateHit,
-				UnInitializeHooks = () => On.Rock.HitSomething -= PenetrateHit,
-			});
-			HookManager.Register("On.ScavengerBomb.HitSomething += PenetrateHit (Penetration)", new HookManager.HookData
-			{
-				Priority = 1,
-				InitializeHooks = () => On.ScavengerBomb.HitSomething += PenetrateHit,
-				UnInitializeHooks = () => On.ScavengerBomb.HitSomething -= PenetrateHit,
-			});
-			if (ModManager.MSC)
-			{
-				HookManager.Register("On.MoreSlugcats.LillyPuck.HitSomething += PenetrateHit (Penetration)", new HookManager.HookData
-				{
-					Priority = 1,
-					InitializeHooks = () => On.MoreSlugcats.LillyPuck.HitSomething += PenetrateHit,
-					UnInitializeHooks = () => On.MoreSlugcats.LillyPuck.HitSomething -= PenetrateHit,
-				});
-			}
-			if (ModManager.Watcher)
-			{
-				HookManager.Register("On.Boomerang.HitSomething += PenetrateHit (Penetration)", new HookManager.HookData
-				{
-					Priority = 1,
-					InitializeHooks = () => On.Boomerang.HitSomething += PenetrateHit,
-					UnInitializeHooks = () => On.Boomerang.HitSomething -= PenetrateHit,
-				});
-			}
-
-		}
-
 		public static bool PenetrateHit<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 			where O: Delegate
 			where W: Weapon
@@ -115,21 +42,46 @@ namespace MySlugcat.Ability
 				return orig_HitSomething(orig_, weapon, result, eu);
 			}
 
-			if (weapon.thrownBy is Player player && player.GetModule().PenetrationAbility)
+			weapon.GetModule(out var weaponModule);
+			if (weapon.thrownBy is Creature)
+			{
+				weaponModule.Owner = new(weapon.thrownBy);
+			}
+			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Player player && player.GetModule().PenetrationAbility)
 			{
 				Room room = weapon.room;
 				if (result.obj is Creature creature && room != null)
 				{
-					weapon.GetModule(out var weaponModule);
-
-					weaponModule.stuckInObject.TryGetTarget(out var target);
-					if (target != creature || weaponModule.stuckInObjectTime > 30)
+					weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
+					if (stuckInObject != creature || weaponModule.stuckInObjectTime > 3)
 					{
 						weaponModule.stuckInObject = new(creature);
 						weaponModule.stuckInObjectTime = 1;
 						weaponModule.penetrateCount += 1;
 
-						if (UnityEngine.Random.value * 10f > Mathf.Max(6.6f, 12f - weaponModule.penetrateCount))
+						if (result.obj is Lizard lizard)
+						{
+							Vector2 attackDir = weapon.firstChunk.vel.normalized; // 攻击方向
+							if (lizard.HitHeadShield(attackDir))
+							{
+								weaponModule.penetrateCount += 2;
+								weapon.firstChunk.vel *= 0.8f;
+							}
+							else if (lizard.HitInMouth(attackDir))
+							{
+								creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 2f), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.25f, 60f);
+							}
+						}
+
+						// 第1次: 100% , 第2次: 82%, 第3次: 64% ... 直到最低 15%
+						float successRate = 1f - (0.18f * (weaponModule.penetrateCount - 1));
+						successRate = Mathf.Clamp(successRate, 0.15f, 1f);
+
+						float roll = UnityEngine.Random.value;
+
+						Log.LogInfo($"穿透次数: {weaponModule.penetrateCount}, 成功率: {successRate:P2}, 随机值: {roll:F2}");
+
+						if (roll > successRate)
 						{
 							return orig_HitSomething(orig_, weapon, result, eu);
 						}
@@ -195,7 +147,9 @@ namespace MySlugcat.Ability
 							{
 								stunBonus = 90f;
 							}
-							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.12f, stunBonus);
+
+							stunBonus *= Mathf.Max(0.5f, 1.1f - (0.15f * weaponModule.penetrateCount));
+							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.01f, stunBonus);
 
 							room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
 						}
@@ -203,13 +157,20 @@ namespace MySlugcat.Ability
 						{
 							weapon.vibrate = 20;
 
-							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Explosion, 0.8f, 85f);
+							float damageBonus = 0.8f;
+							float stunBonus = 85f;
+
+							damageBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							stunBonus *= Mathf.Max(0.5f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Explosion, damageBonus, stunBonus);
 
 							room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
 						}
 						else if (ModManager.Watcher && weapon is Boomerang)
 						{
 							weapon.vibrate = 20;
+
+							float damageBonus = 0.15f;
 							float stunBonus = 45f;
 							if (ModManager.MMF && MMF.cfgIncreaseStuns.Value && (result.obj is Cicada || result.obj is LanternMouse || (ModManager.MSC && result.obj is Yeek)))
 							{
@@ -220,16 +181,24 @@ namespace MySlugcat.Ability
 								stunBonus = 90f;
 							}
 
-							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.15f, stunBonus);
+							damageBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							stunBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, damageBonus, stunBonus);
 
 							room.PlaySound(WatcherEnums.WatcherSoundID.Boomerang_Collide_Creature, weapon.firstChunk);
 						}
 						else
 						{
-							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.2f, 20);
+							float damageBonus = 0.15f;
+							float stunBonus = 20f;
+
+							damageBonus *= Mathf.Max(0.1f, 1.1f - (0.3f * weaponModule.penetrateCount));
+							stunBonus *= Mathf.Max(0.05f, 1.1f - (0.3f * weaponModule.penetrateCount));
+							creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, damageBonus, stunBonus);
 
 							room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
 						}
+						weapon.firstChunk.vel *= 0.8f;
 
 						//震动强度
 						weapon.vibrate = 20;
@@ -254,34 +223,7 @@ namespace MySlugcat.Ability
 			where O : Delegate
 			where W : Weapon
 		{
-			if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
-			{
-				return weapon_orig(weapon, result, eu);
-			}
-			else if (orig_ is On.Spear.orig_HitSomething spear_orig && weapon is Spear spear)
-			{
-				return spear_orig(spear, result, eu);
-			}
-			else if (orig_ is On.Rock.orig_HitSomething rock_orig && weapon is Rock rock)
-			{
-				return rock_orig(rock, result, eu);
-			}
-			else if (orig_ is On.ScavengerBomb.orig_HitSomething bomb_orig && weapon is ScavengerBomb bomb)
-			{
-				return bomb_orig(bomb, result, eu);
-			}
-			else if (ModManager.MSC && orig_ is On.MoreSlugcats.LillyPuck.orig_HitSomething lillyPuck_orig && weapon is LillyPuck lillyPuck)
-			{
-				return lillyPuck_orig(lillyPuck, result, eu);
-			}
-			else if (ModManager.Watcher && orig_ is On.Boomerang.orig_HitSomething boomerang_orig && weapon is Boomerang boomerang)
-			{
-				return boomerang_orig(boomerang, result, eu);
-			}
-			else
-			{
-				return (bool)orig_.DynamicInvoke(weapon, result, eu);
-			}
+			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
 
 		public static void Weapon_Thrown(On.Weapon.orig_Thrown orig, Weapon weapon, Creature thrownBy, Vector2 thrownPos,

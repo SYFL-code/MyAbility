@@ -99,6 +99,49 @@
 	  <Reference Remove="Debug\**" />
 	</ItemGroup>
 
+
+
+	<Target Name="GenerateBuildInfo" BeforeTargets="BeforeBuild">
+		<!-- 确保 version.txt 存在（位于项目根目录，即 src 的上一级） -->
+		<WriteLinesToFile Condition="!Exists('../version.txt')" File="../version.txt" Lines="00" Overwrite="true" />
+
+		<!-- 读取 version.txt -->
+		<ReadLinesFromFile File="../version.txt">
+			<Output TaskParameter="Lines" PropertyName="CurrentVersionNumberRaw" />
+		</ReadLinesFromFile>
+
+		<!-- 修剪并默认 00 -->
+		<PropertyGroup>
+			<CurrentVersionNumber>$([System.String]::Copy('$(CurrentVersionNumberRaw)').Trim())</CurrentVersionNumber>
+			<CurrentVersionNumber Condition="'$(CurrentVersionNumber)' == '' or '$(CurrentVersionNumber)' == ' '">00</CurrentVersionNumber>
+		</PropertyGroup>
+
+		<!-- 递增版本号 -->
+		<PropertyGroup>
+			<CurrentNumberParsed>$([System.Int32]::Parse('$(CurrentVersionNumber)'))</CurrentNumberParsed>
+			<NewVersionNumberInt>$([MSBuild]::Add($(CurrentNumberParsed), 1))</NewVersionNumberInt>
+			<NewVersionNumber>$([System.String]::Format('{0:D2}', $(NewVersionNumberInt)))</NewVersionNumber>
+			<NewVersionString>v$(NewVersionNumber)</NewVersionString>
+			<BuildTime>$([System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))</BuildTime>
+		</PropertyGroup>
+
+		<!-- 写回 version.txt -->
+		<WriteLinesToFile File="../version.txt" Lines="$(NewVersionNumber)" Overwrite="true" />
+
+		<!-- 调用 PowerShell 脚本 -->
+		<Exec Command="powershell -ExecutionPolicy Bypass -File &quot;../../CommonUtils/GenerateBuildInfo.ps1&quot; -VersionString &quot;$(NewVersionString)&quot; -BuildTime &quot;$(BuildTime)&quot;" />
+	</Target>
+
+	<ItemGroup>
+		<Compile Include="../../CommonUtils/src/obj/$(Configuration)/net48/BuildInfo.g.cs">
+			<Link>CommonUtils/%(RecursiveDir)%(Filename)%(Extension)</Link>
+			<Visible>false</Visible>
+			<AutoGen>true</AutoGen>
+			<DesignTime>true</DesignTime>
+		</Compile>
+	</ItemGroup>
+	
+
 	<Target Name="GenerateMod" AfterTargets="PostBuildEvent">
 		<ItemGroup>
 			<RemovePlugins Include="../mod/newest/plugins/*.*" />
