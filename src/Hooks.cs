@@ -1,4 +1,5 @@
 ﻿using CommonUtils.Core;
+using HarmonyLib;
 using ImprovedInput;
 using Menu.Remix;
 using Mono.Cecil;
@@ -37,6 +38,19 @@ public static class Hooks
 	// 注册钩子
 	public static void RegisterHooks()
 	{
+		#region Camouflage
+		HookManager.Register(
+				Hook: () => On.PlayerGraphics.Update += Camouflage.PlayerGraphics_Update,
+				UnHook: () => On.PlayerGraphics.Update -= Camouflage.PlayerGraphics_Update
+			);
+			HookManager.Register(
+				Hook: () => On.PlayerGraphics.DrawSprites += Camouflage.PlayerGraphics_DrawSprites,
+				UnHook: () => On.PlayerGraphics.DrawSprites -= Camouflage.PlayerGraphics_DrawSprites
+			);
+
+		Harmony.CreateAndPatchAll(typeof(Camouflage.Patch_VisibilityBonus));
+		#endregion
+
 		#region Frame
 		{
 			HookManager.Register(
@@ -160,9 +174,8 @@ public static class Hooks
 				);
 			}
 		}
-		#endregion
-
-	}
+        #endregion
+    }
 
 
 	public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace MySlugcat
 {
@@ -37,8 +38,15 @@ namespace MySlugcat
 		public bool PenetrationAbility = false;
 		public bool FrameAbility = false;
 		public bool ArcLightningAbility = false;
+        public bool CamouflageAbility = false;
 
-		public PlayerModule(Player player)
+        //迷彩的实时颜色
+        public Color whiteCamoColor = new Color(0f, 0f, 0f);
+
+        //迷彩的目标颜色
+        public Color whitePickUpColor;
+
+        public PlayerModule(Player player)
 		{
 			_playerRef = new WeakReference<Player>(player);
 
@@ -47,6 +55,7 @@ namespace MySlugcat
 				PenetrationAbility = true;
 				FrameAbility = true;
 				ArcLightningAbility = true;
+				CamouflageAbility = true;
 			}
 		}
 	}

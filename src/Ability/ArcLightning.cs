@@ -141,8 +141,8 @@ namespace MySlugcat.Ability
 					//	StunBonus);
 				}
 
-				// 视觉特效
-				room.AddObject(new DebugSprite(start, target, (target is not Player) ? (320f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 140f));
+                // 视觉特效
+                room.AddObject(new DebugLine(start, target, (target is not Player) ? (320f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 140f));
 				SpawnLightningEffect(room, startPos, targetPos);
 				//room.AddObject(new ExplosionSpikes(room, target.mainBodyChunk.pos, 8, 20f, 5f, 5f, 120f, target.ShortCutColor()));
 
@@ -185,131 +185,6 @@ namespace MySlugcat.Ability
 		{
 			return otherObject is Centipede || otherObject is BigJellyFish || otherObject is Inspector;
 		}
-
-		public class DebugSprite : CosmeticSprite
-		{
-			public WeakReference<Creature> start;
-			public WeakReference<Creature> target;
-
-			private Vector2 startPos;
-			private Vector2 lastStartPos;
-			private Vector2 targetPos;
-			private Vector2 lastTargetPos;
-
-			private float life;
-			private float lastLife;
-			private float lifeTime;
-
-			public DebugSprite(Creature start, Creature target, float lifeTime)
-			{
-				this.start = new WeakReference<Creature>(start);
-				this.target = new WeakReference<Creature>(target);
-
-				this.startPos = start.mainBodyChunk.pos;
-				this.lastStartPos = start.mainBodyChunk.lastPos;
-				this.targetPos = target.mainBodyChunk.pos;
-				this.lastTargetPos = target.mainBodyChunk.lastPos;
-
-				this.lifeTime = lifeTime;
-				this.life = 0f;
-				this.lastLife = 0f;
-			}
-
-			public override void Update(bool eu)
-			{
-				base.Update(eu);
-
-				this.lastLife = this.life;
-				this.life += 1f / (float)this.lifeTime;
-
-				if (this.lastLife > 1f)
-				{
-					this.Destroy();
-					return;
-				}
-
-
-				if (start.TryGetTarget(out Creature startCreature))
-				{
-					lastStartPos = startPos;
-					startPos = startCreature.mainBodyChunk.pos;
-				}
-
-				if (target.TryGetTarget(out Creature targetCreature))
-				{
-					lastTargetPos = targetPos;
-					targetPos = targetCreature.mainBodyChunk.pos;
-				}
-			}
-
-			public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
-			{
-				sLeaser.sprites = new FSprite[1];
-				sLeaser.sprites[0] = new FSprite("Futile_White")
-				{
-					anchorX = 0f,      // 锚点设为0，使scaleX从起点向终点延伸
-					anchorY = 0.5f,    // Y轴居中，旋转中心
-					scaleX = Vector2.Distance(targetPos, startPos) / 4f,
-					scaleY = 1f / 4f, // 设置线条宽度
-					alpha = 1f,
-				};
-
-
-				this.AddToContainer(sLeaser, rCam, null);
-			}
-
-			public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
-			{
-				base.DrawSprites(sLeaser, rCam, timeStacker, camPos);
-
-				// 任一生物失效则隐藏线条
-				if (!start.TryGetTarget(out _) || !target.TryGetTarget(out _))
-				{
-					sLeaser.sprites[0].isVisible = false;
-					return;
-				}
-
-				sLeaser.sprites[0].isVisible = true;
-
-				// 对起点和终点都进行插值，消除抖动
-				Vector2 interpolatedStart = Vector2.Lerp(lastStartPos, startPos, timeStacker);
-				Vector2 interpolatedTarget = Vector2.Lerp(lastTargetPos, targetPos, timeStacker);
-
-				float distance = Vector2.Distance(interpolatedTarget, interpolatedStart);
-
-				Vector2 direction = (interpolatedTarget - interpolatedStart).normalized;
-				float targetAngle = Custom.VecToDeg(direction);
-				//float rotation = Custom.AimFromOneVectorToAnother(interpolatedStart, interpolatedTarget);
-
-				float life = Mathf.Lerp(this.lastLife, this.life, timeStacker);
-				
-				sLeaser.sprites[0].x = interpolatedStart.x - camPos.x;
-				sLeaser.sprites[0].y = interpolatedStart.y - camPos.y;
-				sLeaser.sprites[0].scaleX = distance / 16f;
-				if (distance > 0.01f)
-				{
-					sLeaser.sprites[0].rotation = targetAngle - 90f;
-				}
-				sLeaser.sprites[0].alpha = 1f - life;
-			}
-
-			public override void AddToContainer(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, FContainer? newContatiner)
-			{
-				if (newContatiner == null)
-				{
-					newContatiner = rCam.ReturnFContainer("HUD");
-				}
-
-				foreach (FSprite fsprite in sLeaser.sprites)
-				{
-					fsprite.RemoveFromContainer();
-					newContatiner.AddChild(fsprite);
-				}
-			}
-
-		}
-
-
 
 	}
 }

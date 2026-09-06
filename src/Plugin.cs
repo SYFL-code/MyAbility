@@ -16,6 +16,7 @@ using Noise;
 using On;
 using RewiredConsts;
 using RWCustom;
+using Scrap;
 using Smoke;
 using System;
 using System.Collections;
@@ -112,7 +113,7 @@ public sealed class Plugin : BaseUnityPlugin
 		Hooks.RegisterHooks();
 
         CommonUtils.Core.HookManager.Initialize();
-	}
+    }
 
 	public void OnDisable()
 	{

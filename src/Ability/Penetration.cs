@@ -276,7 +276,6 @@ namespace MySlugcat.Ability
 			bool flag2 = weaponModule2.Owner.TryGetTarget(out var target2) && target2 is Player player2 && player2.GetModule().PenetrationAbility;
 
 			
-
 			if ((!flag && !flag2) || (flag && flag2))
 			{
 				orig(weapon, obj);

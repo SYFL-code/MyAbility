@@ -130,6 +130,10 @@
 
 		<!-- 调用 PowerShell 脚本 -->
 		<Exec Command="powershell -ExecutionPolicy Bypass -File &quot;../../CommonUtils/GenerateBuildInfo.ps1&quot; -VersionString &quot;$(NewVersionString)&quot; -BuildTime &quot;$(BuildTime)&quot;" />
+
+		<!-- 输出版本号和编译时间 -->
+		<Message Importance="High" Text="Version: $(NewVersionString)" />
+		<Message Importance="High" Text="Build Time: $(BuildTime)" />
 	</Target>
 
 	<ItemGroup>

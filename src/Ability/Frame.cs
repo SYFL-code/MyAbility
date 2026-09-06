@@ -19,7 +19,9 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Unity.Microsoft.GDK;
 using UnityEngine;
+using UnityEngine.UIElements;
 using Watcher;
 using static Menu.Remix.InternalOI;
 using static MonoMod.InlineRT.MonoModRule;
@@ -40,6 +42,11 @@ namespace MySlugcat.Ability
 
 					creature.dead = false;
 					creature.stun = 0;
+
+					if (creature is Player player)
+					{
+						ExitGameOverMode(player);
+					}
 
 					target.Violence(creature.mainBodyChunk, null, target.mainBodyChunk, null, Creature.DamageType.None, 0.1f, 60f);
 
@@ -92,6 +99,42 @@ namespace MySlugcat.Ability
 			}
 		}
 
+		public static void ExitGameOverMode(Player player)
+		{
+			// 当复活玩家时尝试退出 "游戏结束模式" 。可能与其他一些模块不兼容。
+			if (!player.isNPC)
+			{
+				for (int i = 0; i < (player.room?.game?.cameras?.Length ?? 0); i++)
+				{
+					if (player.room?.game?.cameras[i]?.hud?.textPrompt != null)
+					{
+						player.room.game.cameras[i].hud.textPrompt.gameOverMode = false;
+					}
+				}
+
+				if (player.room?.game?.arenaOverlay != null)
+				{
+					player.room.game.arenaOverlay.ShutDownProcess();
+
+					ProcessManager manager = player.room.game.manager;
+					if (manager != null)
+					{
+						List<MainLoopProcess> sideProcesses = manager.sideProcesses;
+						if (sideProcesses != null)
+						{
+							sideProcesses.Remove(player.room.game.arenaOverlay);
+						}
+					}
+					player.room.game.arenaOverlay = null;
+					if (player.room.game.session is ArenaGameSession arenaSession)
+					{
+						arenaSession.sessionEnded = false;
+						arenaSession.challengeCompleted = false;
+						arenaSession.endSessionCounter = -1;
+					}
+				}
+			}
+		}
 
 		public static bool Frame_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 			where O : Delegate
@@ -136,7 +179,7 @@ namespace MySlugcat.Ability
 		public static void Creature_Violence(On.Creature.orig_Violence orig, Creature creature, BodyChunk source, Vector2? directionAndMomentum,
 			BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
 		{
-			if (hitChunk != null && hitChunk.owner is Player player)
+			if (creature is Player player)
 			{
 				if (player.GetModule().FrameAbility)
 				{
@@ -144,33 +187,66 @@ namespace MySlugcat.Ability
 						type == Creature.DamageType.Electric ||
 						type == Creature.DamageType.Stab)
 					{
-						if (creature is Lizard)
+						Creature? killer = null;
+						if (source.owner is Creature c)
 						{
-							Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, creature]);
+							killer = c;
+						}
+						if (source.owner is Weapon w)
+						{
+							killer = w.thrownBy;
+						}
+
+
+						//if (killer is Lizard)
+						//{
+						//	Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, killer]);
+
+						//	bool FrameResult = FrameTarget(player, target);
+						//	if (FrameResult)
+						//	{
+						//		orig.Invoke(target, source, directionAndMomentum, target?.mainBodyChunk, null, type, damage, stunBonus);
+						//		return;
+						//	}
+						//}
+
+						//偷渡虫情况特殊处理
+						if (source != null && source.owner is StowawayBug stowawayBug)
+						{
+							//钩子伤害不处理
+							if (damage < 1f)
+							{ }
+							else
+							{
+								Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, stowawayBug]);
+
+								bool FrameResult = FrameTarget(player, target);
+								if (FrameResult)
+								{
+									orig.Invoke(target, source, directionAndMomentum, target?.mainBodyChunk, null, type, damage, stunBonus);
+									player.stun = 0;
+
+									return;
+								}
+							}
+						}
+
+						if (killer != null)
+						{
+							Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, killer]);
 
 							bool FrameResult = FrameTarget(player, target);
 							if (FrameResult)
 							{
-								orig.Invoke(target, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
-							}
-						}
-
-						//偷渡虫情况特殊处理
-						if (source != null && source.owner is StowawayBug)
-						{
-							//钩子伤害不处理
-							if (damage < 1f)
-								orig.Invoke(creature, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
-							else
-							{
-								orig.Invoke(creature, source, directionAndMomentum, hitChunk, hitAppendage, type, 0, stunBonus);
+								orig.Invoke(target, source, directionAndMomentum, target?.mainBodyChunk, null, type, damage, stunBonus);
 								player.stun = 0;
+
+								return;
 							}
-							return;
 						}
 
 						//防止玩家被咬死
-						orig.Invoke(creature, source, directionAndMomentum, hitChunk, hitAppendage, type, 0, stunBonus);
+						//orig.Invoke(creature, source, directionAndMomentum, hitChunk, hitAppendage, type, 0, stunBonus);
 					}
 				}
 			}
