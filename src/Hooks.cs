@@ -174,8 +174,23 @@ public static class Hooks
 				);
 			}
 		}
-        #endregion
-    }
+		#endregion
+
+
+		try
+		{
+			//Scrap.Zname.OnEnable();
+
+			// 创建同一个 Harmony 实例，一次性 Patch 所有类
+			//Harmony harmony = new Harmony("com.test.id");
+			// 这会自动扫描当前程序集，并按优先级排序所有补丁
+			//harmony.PatchAll();
+		}
+		catch (Exception ex)
+		{
+			Log.LogError($"Error registering hooks: {ex}");
+		}
+	}
 
 
 	public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
