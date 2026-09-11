@@ -39,7 +39,71 @@ public static class Hooks
 	// 注册钩子
 	public static void RegisterHooks()
 	{
+		#region Hooks
+		{
+			// HitSomething
+			HookManager.Register(
+				Hook: () => On.Weapon.HitSomething += Weapon_HitSomething,
+				UnHook: () => On.Weapon.HitSomething -= Weapon_HitSomething
+			);
+			HookManager.Register(
+				Hook: () => On.Spear.HitSomething += Weapon_HitSomething,
+				UnHook: () => On.Spear.HitSomething -= Weapon_HitSomething
+			);
+			HookManager.Register(
+				Hook: () => On.Rock.HitSomething += Weapon_HitSomething,
+				UnHook: () => On.Rock.HitSomething -= Weapon_HitSomething
+			);
+			HookManager.Register(
+				Hook: () => On.ScavengerBomb.HitSomething += Weapon_HitSomething,
+				UnHook: () => On.ScavengerBomb.HitSomething -= Weapon_HitSomething
+			);
+			if (ModManager.MSC)
+			{
+				HookManager.Register(
+					Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Weapon_HitSomething,
+					UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Weapon_HitSomething
+				);
+			}
+			if (ModManager.Watcher)
+			{
+				HookManager.Register(
+					Hook: () => On.Boomerang.HitSomething += Weapon_HitSomething,
+					UnHook: () => On.Boomerang.HitSomething -= Weapon_HitSomething
+				);
+			}
+		}
+		#endregion
 
+		#region ModuleHooks
+		{
+			HookManager.Register(
+				Hook: () => On.Weapon.Update += ModuleHooks.Weapon_Update,
+				UnHook: () => On.Weapon.Update -= ModuleHooks.Weapon_Update
+			);
+			HookManager.Register(
+				Hook: () => On.Weapon.Thrown += ModuleHooks.Weapon_Thrown,
+				UnHook: () => On.Weapon.Thrown -= ModuleHooks.Weapon_Thrown
+			);
+			HookManager.Register(
+				Hook: () => RegisterHitSomething(ModuleHooks.Weapon_HitSomething),
+				UnHook: () => UnregisterHitSomething(ModuleHooks.Weapon_HitSomething)
+			);
+		}
+		#endregion
+
+		#region Deflagration
+		{
+			HookManager.Register(
+				Hook: () => On.Player.Die += Deflagration.Player_Die,
+				UnHook: () => On.Player.Die -= Deflagration.Player_Die
+			);
+			HookManager.Register(
+				Hook: () => RegisterHitSomething(Deflagration.Deflagration_HitSomething),
+				UnHook: () => UnregisterHitSomething(Deflagration.Deflagration_HitSomething)
+			);
+		}
+		#endregion
 
 		#region Camouflage
 		HookManager.Register(
@@ -228,19 +292,37 @@ public static class Hooks
 		}
 	}
 
+	private static readonly ConditionalWeakTable<Delegate, Func<Weapon, SharedPhysics.CollisionResult, bool, bool>> _origCache = new();
 	private static List<Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool>> _hitSomethingHandlers = [];
+	public static void RegisterHitSomething(Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> handler)
+	{
+		_hitSomethingHandlers.Add(handler);
+	}
+	public static void UnregisterHitSomething(Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> handler)
+	{
+		_hitSomethingHandlers.Remove(handler);
+	}
+
+	// HitSomething 钩子入口（LIFO）
 	public static bool Weapon_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 		where O : Delegate
 		where W : Weapon
 	{
 		Func<W, SharedPhysics.CollisionResult, bool, bool> orig = Invoke_HitSomething<O, W>(orig_);
-
-		for (int i = 0; i < _hitSomethingHandlers.Count; i++)
+		if (!_origCache.TryGetValue(orig_, out Func<Weapon, SharedPhysics.CollisionResult, bool, bool> cached))
 		{
-			int index = i;
-			var prev = orig;
-			orig = (weapon_, result_, eu_) => _hitSomethingHandlers[index](prev, weapon_, result_, eu_);
+			for (int i = 0; i < _hitSomethingHandlers.Count; i++)
+			{
+				int index = i;
+				var prev = orig;
+				orig = (weapon_, result_, eu_) => _hitSomethingHandlers[index](prev, weapon_, result_, eu_);
+			}
 		}
+		else
+		{
+			orig = cached;
+		}
+
 		return orig(weapon, result, eu);
 	}
 	public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
@@ -270,6 +352,10 @@ public static class Hooks
 		else if (ModManager.Watcher && orig_ is On.Boomerang.orig_HitSomething boomerang_orig && weapon is Boomerang boomerang)
 		{
 			return boomerang_orig(boomerang, result, eu);
+		}
+		else if (orig_ is Func<W, SharedPhysics.CollisionResult, bool, bool> func)
+		{
+			return func(weapon, result, eu);
 		}
 		else
 		{

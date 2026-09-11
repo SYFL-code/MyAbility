@@ -273,7 +273,8 @@ namespace MySlugcat.Ability
 				}
 			}
 
-		}
+            orig(weapon, thrownBy, thrownPos, firstFrameTraceFromPos, throwDir, frc, eu);
+        }
 
 		public static void Weapon_HitAnotherThrownWeapon(On.Weapon.orig_HitAnotherThrownWeapon orig, Weapon weapon, Weapon obj)
 		{
