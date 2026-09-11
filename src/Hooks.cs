@@ -1,5 +1,6 @@
 ﻿using CommonUtils.Core;
 using HarmonyLib;
+using IL;
 using ImprovedInput;
 using Menu.Remix;
 using Mono.Cecil;
@@ -38,17 +39,56 @@ public static class Hooks
 	// 注册钩子
 	public static void RegisterHooks()
 	{
+
+
 		#region Camouflage
 		HookManager.Register(
-				Hook: () => On.PlayerGraphics.Update += Camouflage.PlayerGraphics_Update,
-				UnHook: () => On.PlayerGraphics.Update -= Camouflage.PlayerGraphics_Update
+				Hook: () => On.Player.Update += Camouflage.Player_Update,
+				UnHook: () => On.Player.Update -= Camouflage.Player_Update
+			);
+		HookManager.Register(
+				Hook: () => On.Player.ThrowObject += Camouflage.Player_ThrowObject,
+				UnHook: () => On.Player.ThrowObject -= Camouflage.Player_ThrowObject
 			);
 			HookManager.Register(
 				Hook: () => On.PlayerGraphics.DrawSprites += Camouflage.PlayerGraphics_DrawSprites,
 				UnHook: () => On.PlayerGraphics.DrawSprites -= Camouflage.PlayerGraphics_DrawSprites
 			);
 
-		Harmony.CreateAndPatchAll(typeof(Camouflage.Patch_VisibilityBonus));
+		//Harmony.CreateAndPatchAll(typeof(Camouflage.Patch_VisibilityBonus));
+		//Harmony.Patch(AccessTools.Method("命名空间.类名称.方法名称"), prefix: new HarmonyMethod(typeof(钩子方法的类), nameof(钩子方法的名称)));
+
+
+		//MethodInfo target = typeof(Player).GetProperty("VisibilityBonus", BindingFlags.Public | BindingFlags.Instance).GetGetMethod();
+		//if (target != null)
+		//{
+		//	var hook = new Hook(
+		//		target,
+		//		new Func<Func<Player, float>, Player, float>((orig, self) =>
+		//		{
+		//			// 先执行原始方法（等价于 Prefix + Original）
+		//			float result = orig(self);
+
+		//			// Postfix 逻辑
+		//			try
+		//			{
+		//				self.GetModule(out var module);
+		//				if (module.CamouflageAbility)
+		//				{
+		//					float visibility = (ColorHelper.Lerp(module.whitePickUpColor, self.ShortCutColor(), module.whiteCamoColor) * 2f) - 0.8f;
+		//					Log.LogInfo($"__result:{result}, visibility:{visibility}");
+		//					result = Mathf.Min(result, visibility);
+		//				}
+		//			}
+		//			catch (Exception e)
+		//			{
+		//				Log.LogError($"[MonoMod] VisibilityBonus 补丁出错: {e.Message}");
+		//			}
+
+		//			return result;
+		//		})
+		//	);
+		//}
 		#endregion
 
 		#region Frame
@@ -129,10 +169,6 @@ public static class Hooks
 		#region Penetration
 		{
 			HookManager.Register(
-				Hook: () => On.Weapon.Update += Penetration.Weapon_Update,
-				UnHook: () => On.Weapon.Update -= Penetration.Weapon_Update
-			);
-			HookManager.Register(
 				Hook: () => On.Weapon.Thrown += Penetration.Weapon_Thrown,
 				UnHook: () => On.Weapon.Thrown -= Penetration.Weapon_Thrown
 			);
@@ -192,7 +228,21 @@ public static class Hooks
 		}
 	}
 
+	private static List<Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool>> _hitSomethingHandlers = [];
+	public static bool Weapon_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
+		where O : Delegate
+		where W : Weapon
+	{
+		Func<W, SharedPhysics.CollisionResult, bool, bool> orig = Invoke_HitSomething<O, W>(orig_);
 
+		for (int i = 0; i < _hitSomethingHandlers.Count; i++)
+		{
+			int index = i;
+			var prev = orig;
+			orig = (weapon_, result_, eu_) => _hitSomethingHandlers[index](prev, weapon_, result_, eu_);
+		}
+		return orig(weapon, result, eu);
+	}
 	public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 		where O : Delegate
 		where W : Weapon
@@ -224,6 +274,43 @@ public static class Hooks
 		else
 		{
 			return (bool)orig_.DynamicInvoke(weapon, result, eu);
+		}
+	}
+	public static Func<W, SharedPhysics.CollisionResult, bool, bool> Invoke_HitSomething<O, W>(O orig_)
+		where O : Delegate
+		where W : Weapon
+	{
+		if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
+		{
+			return weapon_orig.Invoke;
+		}
+		else if (orig_ is On.Spear.orig_HitSomething spear_orig)
+		{
+			return (w, r, e) => spear_orig((Spear)(object)w, r, e);
+		}
+		else if (orig_ is On.Rock.orig_HitSomething rock_orig)
+		{
+			return (w, r, e) => rock_orig((Rock)(object)w, r, e);
+		}
+		else if (orig_ is On.ScavengerBomb.orig_HitSomething bomb_orig)
+		{
+			return (w, r, e) => bomb_orig((ScavengerBomb)(object)w, r, e);
+		}
+		else if (ModManager.MSC && orig_ is On.MoreSlugcats.LillyPuck.orig_HitSomething lillyPuck_orig)
+		{
+			return (w, r, e) => lillyPuck_orig((LillyPuck)(object)w, r, e);
+		}
+		else if (ModManager.Watcher && orig_ is On.Boomerang.orig_HitSomething boomerang_orig)
+		{
+			return (w, r, e) => boomerang_orig((Boomerang)(object)w, r, e);
+		}
+		else if (orig_ is Func<W, SharedPhysics.CollisionResult, bool, bool> func)
+		{
+			return func;
+		}
+		else
+		{
+			return (w, r, e) => (bool)orig_.DynamicInvoke(w, r, e);
 		}
 	}
 

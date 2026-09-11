@@ -14,7 +14,6 @@ using System;
 using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -46,6 +45,15 @@ namespace MySlugcat.Ability
 					if (creature is Player player)
 					{
 						ExitGameOverMode(player);
+
+						if (!Plugin.DebugMode || !Debugger.bools[0, false])
+						{
+							if (player.GetModule().CamouflageAbility)
+							{
+								player.GetCamouflageModule(out var camouflageModule);
+								camouflageModule.CdTimer = 200;
+							}
+						}
 					}
 
 					target.Violence(creature.mainBodyChunk, null, target.mainBodyChunk, null, Creature.DamageType.None, 0.1f, 60f);
@@ -176,7 +184,7 @@ namespace MySlugcat.Ability
 		}
 
 
-		public static void Creature_Violence(On.Creature.orig_Violence orig, Creature creature, BodyChunk source, Vector2? directionAndMomentum,
+		public static void Creature_Violence(On.Creature.orig_Violence orig, Creature creature, BodyChunk? source, Vector2? directionAndMomentum,
 			BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
 		{
 			if (creature is Player player)
@@ -188,11 +196,11 @@ namespace MySlugcat.Ability
 						type == Creature.DamageType.Stab)
 					{
 						Creature? killer = null;
-						if (source.owner is Creature c)
+						if (source?.owner is Creature c)
 						{
 							killer = c;
 						}
-						if (source.owner is Weapon w)
+						if (source?.owner is Weapon w)
 						{
 							killer = w.thrownBy;
 						}

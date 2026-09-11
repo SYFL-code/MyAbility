@@ -13,7 +13,6 @@ using Smoke;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -42,11 +41,8 @@ namespace MySlugcat.Ability
 				return orig_HitSomething(orig_, weapon, result, eu);
 			}
 
+
 			weapon.GetModule(out var weaponModule);
-			if (weapon.thrownBy is Creature)
-			{
-				weaponModule.Owner = new(weapon.thrownBy);
-			}
 			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Player player && player.GetModule().PenetrationAbility)
 			{
 				Room room = weapon.room;
@@ -64,7 +60,7 @@ namespace MySlugcat.Ability
 							Vector2 attackDir = weapon.firstChunk.vel.normalized; // 攻击方向
 							if (lizard.HitHeadShield(attackDir))
 							{
-								weaponModule.penetrateCount += 2;
+								//weaponModule.penetrateCount += 1;
 								weapon.firstChunk.vel *= 0.8f;
 							}
 							else if (lizard.HitInMouth(attackDir))
@@ -229,36 +225,54 @@ namespace MySlugcat.Ability
 		public static void Weapon_Thrown(On.Weapon.orig_Thrown orig, Weapon weapon, Creature thrownBy, Vector2 thrownPos,
 			Vector2? firstFrameTraceFromPos, IntVector2 throwDir, float frc, bool eu)
 		{
-			orig(weapon, thrownBy, thrownPos, firstFrameTraceFromPos, throwDir, frc, eu);
-
-			weapon.GetModule(out var weaponModule);
-			weaponModule.Owner = new(thrownBy);
-		}
-
-
-		public static void Weapon_Update(On.Weapon.orig_Update orig, Weapon weapon, bool eu)
-		{
-			orig(weapon, eu);
-
-			weapon.GetModule(out var weaponModule);
-			if (weapon.mode != Weapon.Mode.Thrown && weapon.mode != Weapon.Mode.StuckInCreature)
+			if (Plugin.DebugMode)
 			{
-				weaponModule.stuckInObject = new(null);
-				weaponModule.stuckInObjectTime = 0;
-				weaponModule.penetrateCount = 0;
+				weapon.GetModule(out var weaponModule);
+				if (weaponModule.Owner.TryGetTarget(out var owner2) && owner2 is Creature)
+				{
+					Vector2 startPos = weapon.firstChunk.pos;
+					Vector2 vel = weapon.firstChunk.vel;
+
+					if (vel.sqrMagnitude >= 0.01f)
+					{
+						List<Creature> candidates = Helper.FindCreaturesInCone(startPos, weapon.firstChunk.vel.normalized, weapon.room,
+							80f, 30f * 20f, [thrownBy], [thrownBy.GetType()], true);
+
+						if (candidates != null && candidates.Count > 0)
+						{
+							candidates.Sort((a, b) =>
+							{
+								float da = Vector2.Distance(startPos, a.mainBodyChunk.pos);
+								float db = Vector2.Distance(startPos, b.mainBodyChunk.pos);
+								return da.CompareTo(db);
+							});
+
+
+							Creature target = candidates[0];
+							Vector2 currentPos = weapon.firstChunk.pos;
+							Vector2 toTarget = target.mainBodyChunk.pos - currentPos;
+
+							if (toTarget.sqrMagnitude > 40f) // 距离太近就不追，防抖动
+							{
+								float speed = weapon.firstChunk.vel.magnitude;
+								if (speed >= 0.01f)
+								{
+									Vector2 currentDir = weapon.firstChunk.vel / speed;
+									Vector2 desiredDir = toTarget.normalized;
+
+									float turnSpeed = 0.15f; // 转向快慢，自己调
+									turnSpeed = Debugger.floats[0, 0.15f, "turnSpeed"];
+
+									Vector2 newDir = Vector2.Lerp(currentDir, desiredDir, turnSpeed).normalized;
+
+									weapon.firstChunk.vel = newDir * speed; // 只改方向，速度不变
+								}
+							}
+						}
+					}
+				}
 			}
 
-			//if (weapon.mode != Weapon.Mode.Thrown && weapon.mode != Weapon.Mode.StuckInCreature &&
-			//	weapon.thrownBy != null && weapon.thrownBy is Player player2 && player2.GetModule().PenetrationAbility)
-			//{
-			//	weapon.thrownBy = null;
-			//}
-
-			/*if ((weapon.mode != Weapon.Mode.Thrown && weapon.mode != Weapon.Mode.StuckInCreature) && 
-				weapon.firstChunk.owner != null && weapon.firstChunk.owner is Player player__ && player__.GetModule().PenetrationSkill)
-			{
-				weapon.firstChunk.owner = null;
-			}*/
 		}
 
 		public static void Weapon_HitAnotherThrownWeapon(On.Weapon.orig_HitAnotherThrownWeapon orig, Weapon weapon, Weapon obj)

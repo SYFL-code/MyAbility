@@ -1,10 +1,32 @@
 ﻿using CommonUtils.Core;
+using HarmonyLib;
+using ImprovedInput;
+using Menu.Remix;
+using Mono.Cecil;
+using MonoMod.RuntimeDetour;
+using MoreSlugcats;
+using MySlugcat.Ability;
+using On;
+using RewiredConsts;
+using RWCustom;
+using SlugBase.Features;
+using Smoke;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
+using Watcher;
+using static CommonUtils.Core.HookManager;
+using static PhysicalObject;
 
 namespace MySlugcat
 {
@@ -38,15 +60,11 @@ namespace MySlugcat
 		public bool PenetrationAbility = false;
 		public bool FrameAbility = false;
 		public bool ArcLightningAbility = false;
-        public bool CamouflageAbility = false;
+		public bool CamouflageAbility = false;
+		public bool DeflagrationAbility = false;
 
-        //迷彩的实时颜色
-        public Color whiteCamoColor = new Color(0f, 0f, 0f);
 
-        //迷彩的目标颜色
-        public Color whitePickUpColor;
-
-        public PlayerModule(Player player)
+		public PlayerModule(Player player)
 		{
 			_playerRef = new WeakReference<Player>(player);
 
@@ -56,6 +74,7 @@ namespace MySlugcat
 				FrameAbility = true;
 				ArcLightningAbility = true;
 				CamouflageAbility = true;
+				DeflagrationAbility = true;
 			}
 		}
 	}
@@ -77,4 +96,54 @@ namespace MySlugcat
 		}
 	}
 
+	public static class ModuleHooks
+	{
+		public static bool Weapon_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
+			where O : Delegate
+			where W : Weapon
+		{
+			weapon.GetModule(out var weaponModule);
+			if (weapon.thrownBy != null)
+			{
+				weaponModule.Owner = new(weapon.thrownBy);
+			}
+
+			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
+		}
+
+		public static void Weapon_Thrown(On.Weapon.orig_Thrown orig, Weapon weapon, Creature thrownBy, Vector2 thrownPos,
+			Vector2? firstFrameTraceFromPos, IntVector2 throwDir, float frc, bool eu)
+		{
+			orig(weapon, thrownBy, thrownPos, firstFrameTraceFromPos, throwDir, frc, eu);
+
+			weapon.GetModule(out var weaponModule);
+			weaponModule.Owner = new(thrownBy);
+		}
+
+		public static void Weapon_Update(On.Weapon.orig_Update orig, Weapon weapon, bool eu)
+		{
+			orig(weapon, eu);
+
+			weapon.GetModule(out var weaponModule);
+			if (weapon.mode != Weapon.Mode.Thrown && weapon.mode != Weapon.Mode.StuckInCreature)
+			{
+				weaponModule.stuckInObject = new(null);
+				weaponModule.stuckInObjectTime = 0;
+				weaponModule.penetrateCount = 0;
+			}
+
+			//if (weapon.mode != Weapon.Mode.Thrown && weapon.mode != Weapon.Mode.StuckInCreature &&
+			//	weapon.thrownBy != null && weapon.thrownBy is Player player2 && player2.GetModule().PenetrationAbility)
+			//{
+			//	weapon.thrownBy = null;
+			//}
+
+			/*if ((weapon.mode != Weapon.Mode.Thrown && weapon.mode != Weapon.Mode.StuckInCreature) && 
+				weapon.firstChunk.owner != null && weapon.firstChunk.owner is Player player__ && player__.GetModule().PenetrationSkill)
+			{
+				weapon.firstChunk.owner = null;
+			}*/
+		}
+
+	}
 }

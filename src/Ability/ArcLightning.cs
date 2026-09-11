@@ -44,10 +44,6 @@ namespace MySlugcat.Ability
 			}
 
 			weapon.GetModule(out var weaponModule);
-			if (weapon.thrownBy is Creature)
-			{
-				weaponModule.Owner = new(weapon.thrownBy);
-			}
 			if (weaponModule.Owner.TryGetTarget(out var target) && target is Player player)
 			{
 				if (player.GetModule().ArcLightningAbility)
@@ -118,6 +114,9 @@ namespace MySlugcat.Ability
 					Recharge(weapon, start, player);
 					remainingChains += 3;
 				}
+
+
+				float stunBonus = (target is not Player) ? (120f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 80f;
 				if (target is not BigEel && !isElectricCreature)
 				{
 					// 施加电击伤害和眩晕
@@ -127,7 +126,7 @@ namespace MySlugcat.Ability
 						null,
 						Creature.DamageType.Electric,
 						0.1f,
-						(target is not Player) ? (320f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 140f);
+						stunBonus);
 
 					room.AddObject(new CreatureSpasmer(target, false, target.stun));
 
@@ -141,8 +140,8 @@ namespace MySlugcat.Ability
 					//	StunBonus);
 				}
 
-                // 视觉特效
-                room.AddObject(new DebugLine(start, target, (target is not Player) ? (320f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 140f));
+				// 视觉特效
+				room.AddObject(new DebugLine(start, target, (target is not Player) ? (320f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 140f));
 				SpawnLightningEffect(room, startPos, targetPos);
 				//room.AddObject(new ExplosionSpikes(room, target.mainBodyChunk.pos, 8, 20f, 5f, 5f, 120f, target.ShortCutColor()));
 
