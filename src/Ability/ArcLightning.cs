@@ -53,9 +53,16 @@ namespace MySlugcat.Ability
 						weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
 						if (stuckInObject != hitCreature || weaponModule.stuckInObjectTime > 30)
 						{
-							List<Creature> exclude = [player];
-							// 执行连锁
-							ArcTriggerChain(weapon, hitCreature, player, weapon.firstChunk.vel.normalized, ref exclude, 5);
+							if (weapon is not Spear && player.GetModule().DeflagrationAbility && false) // false
+                            {
+								Log.LogInfo($"不触发");
+							}
+							else
+							{
+								List<Creature> exclude = [player];
+								// 执行连锁
+								ArcTriggerChain(weapon, hitCreature, player, weapon.firstChunk.vel.normalized, ref exclude, 5);
+							}
 						}
 					}
 				}
@@ -141,7 +148,7 @@ namespace MySlugcat.Ability
 				}
 
 				// 视觉特效
-				room.AddObject(new DebugLine(start, target, (target is not Player) ? (320f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 140f));
+				room.AddObject(new DebugLine(start, target, stunBonus));
 				SpawnLightningEffect(room, startPos, targetPos);
 				//room.AddObject(new ExplosionSpikes(room, target.mainBodyChunk.pos, 8, 20f, 5f, 5f, 120f, target.ShortCutColor()));
 

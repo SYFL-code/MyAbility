@@ -49,6 +49,10 @@
 			<Private>false</Private>
 		</Reference>
 
+		<!-- <Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/Newtonsoft.Json.dll">
+			<Private>false</Private>
+		</Reference> -->
+
 		<Reference Include="$(RainWorldDir)/RainWorld_Data/Managed/com.playeveryware.eos-Editor.steam.utility.dll">
 			<Private>false</Private>
 		</Reference>

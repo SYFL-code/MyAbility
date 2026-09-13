@@ -5,6 +5,7 @@ using RewiredConsts;
 using RWCustom;
 using Smoke;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -14,6 +15,7 @@ using Watcher;
 
 namespace MySlugcat.Ability
 {
+	// 爆燃能力
 	public static class Deflagration
 	{
 
@@ -149,35 +151,46 @@ namespace MySlugcat.Ability
 			{
 				if (player.GetModule().DeflagrationAbility)
 				{
-					int percentage = 8;
-					if (weapon is Spear)
+					if (result.obj is Creature hitCreature)
 					{
-						percentage = 12;
-					}
-					else if (weapon is Rock)
-					{
-						percentage = 8;
-					}
-					else if (weapon is ScavengerBomb)
-					{
-						percentage = 60;
-					}
-					else if (weapon is PuffBall)
-					{
-						percentage = 14;
-					}
-					else if (ModManager.MSC && weapon is LillyPuck)
-					{
-						percentage = 8;
-					}
-					else if (ModManager.Watcher && weapon is Boomerang)
-					{
-						percentage = 16;
-					}
+						weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
+						if (stuckInObject != hitCreature || weaponModule.stuckInObjectTime > 30)
+						{
+							float percentage = 8;
+							if (weapon is Spear)
+							{
+								percentage = 12;
+								if (player.GetModule().ArcLightningAbility)
+								{
+									percentage = 0.1f;
+								}
+							}
+							else if (weapon is Rock)
+							{
+								percentage = 8;
+							}
+							else if (weapon is ScavengerBomb)
+							{
+								percentage = 60;
+							}
+							else if (weapon is PuffBall)
+							{
+								percentage = 14;
+							}
+							else if (ModManager.MSC && weapon is LillyPuck)
+							{
+								percentage = 8;
+							}
+							else if (ModManager.Watcher && weapon is Boomerang)
+							{
+								percentage = 16;
+							}
 
-					if (percentage > UnityEngine.Random.Range(0, 100))
-					{
-						Explode(weapon, result.chunk, player);
+							if (percentage > UnityEngine.Random.Range(0, 100))
+							{
+								Explode(weapon, result.chunk, player);
+							}
+						}
 					}
 				}
 			}
@@ -189,7 +202,6 @@ namespace MySlugcat.Ability
 		{
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
-
 
 		public static void Player_Die(On.Player.orig_Die orig, Player player)
 		{

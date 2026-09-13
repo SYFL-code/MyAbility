@@ -5,6 +5,7 @@ using ImprovedInput;
 using Menu.Remix;
 using Mono.Cecil;
 using MonoMod.RuntimeDetour;
+using MonoMod.RuntimeDetour.HookGen;
 using MoreSlugcats;
 using MySlugcat.Ability;
 using On;
@@ -39,6 +40,12 @@ public static class Hooks
 	// 注册钩子
 	public static void RegisterHooks()
 	{
+		#region Creatures
+		{
+
+		}
+		#endregion
+
 		#region Hooks
 		{
 			// HitSomething
@@ -86,8 +93,17 @@ public static class Hooks
 				UnHook: () => On.Weapon.Thrown -= ModuleHooks.Weapon_Thrown
 			);
 			HookManager.Register(
-				Hook: () => RegisterHitSomething(ModuleHooks.Weapon_HitSomething),
-				UnHook: () => UnregisterHitSomething(ModuleHooks.Weapon_HitSomething)
+				Hook: () => HitSomething += ModuleHooks.Weapon_HitSomething,
+				UnHook: () => HitSomething -= ModuleHooks.Weapon_HitSomething
+			);
+		}
+		#endregion
+
+		#region TrackingThrow
+		{
+			HookManager.Register(
+				Hook: () => On.Weapon.Thrown += TrackingThrow.Weapon_Thrown,
+				UnHook: () => On.Weapon.Thrown -= TrackingThrow.Weapon_Thrown
 			);
 		}
 		#endregion
@@ -99,8 +115,8 @@ public static class Hooks
 				UnHook: () => On.Player.Die -= Deflagration.Player_Die
 			);
 			HookManager.Register(
-				Hook: () => RegisterHitSomething(Deflagration.Deflagration_HitSomething),
-				UnHook: () => UnregisterHitSomething(Deflagration.Deflagration_HitSomething)
+				Hook: () => HitSomething += Deflagration.Deflagration_HitSomething,
+				UnHook: () => HitSomething -= Deflagration.Deflagration_HitSomething
 			);
 		}
 		#endregion
@@ -233,10 +249,6 @@ public static class Hooks
 		#region Penetration
 		{
 			HookManager.Register(
-				Hook: () => On.Weapon.Thrown += Penetration.Weapon_Thrown,
-				UnHook: () => On.Weapon.Thrown -= Penetration.Weapon_Thrown
-			);
-			HookManager.Register(
 				Hook: () => On.Weapon.HitAnotherThrownWeapon += Penetration.Weapon_HitAnotherThrownWeapon,
 				UnHook: () => On.Weapon.HitAnotherThrownWeapon -= Penetration.Weapon_HitAnotherThrownWeapon
 			);
@@ -292,15 +304,38 @@ public static class Hooks
 		}
 	}
 
-	private static readonly ConditionalWeakTable<Delegate, Func<Weapon, SharedPhysics.CollisionResult, bool, bool>> _origCache = new();
-	private static List<Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool>> _hitSomethingHandlers = [];
-	public static void RegisterHitSomething(Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> handler)
+	public static event Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> HitSomething
 	{
-		_hitSomethingHandlers.Add(handler);
+		add
+		{
+			_hitSomethingHandlers.Add(value);
+			Rebuild();
+		}
+		remove
+		{
+			_hitSomethingHandlers.Remove(value);
+			Rebuild();
+		}
 	}
-	public static void UnregisterHitSomething(Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> handler)
+	private static List<Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool>> _hitSomethingHandlers = [];
+	[ThreadStatic]
+	private static Stack<Func<Weapon, SharedPhysics.CollisionResult, bool, bool>> _origStack = new Stack<Func<Weapon, SharedPhysics.CollisionResult, bool, bool>>();
+	private static Func<Weapon, SharedPhysics.CollisionResult, bool, bool>? chain = null;
+	public static void Rebuild()
 	{
-		_hitSomethingHandlers.Remove(handler);
+		if (_hitSomethingHandlers.Count == 0)
+		{
+			chain = null;
+			return;
+		}
+
+		chain = (weapon_, result_, eu_) => _hitSomethingHandlers[0](_origStack.Peek(), weapon_, result_, eu_);
+		for (int i = 1; i < _hitSomethingHandlers.Count; i++)
+		{
+			int index = i;
+			var prev = chain;
+			chain = (weapon_, result_, eu_) => _hitSomethingHandlers[index](prev, weapon_, result_, eu_);
+		}
 	}
 
 	// HitSomething 钩子入口（LIFO）
@@ -308,59 +343,26 @@ public static class Hooks
 		where O : Delegate
 		where W : Weapon
 	{
-		Func<W, SharedPhysics.CollisionResult, bool, bool> orig = Invoke_HitSomething<O, W>(orig_);
-		if (!_origCache.TryGetValue(orig_, out Func<Weapon, SharedPhysics.CollisionResult, bool, bool> cached))
-		{
-			for (int i = 0; i < _hitSomethingHandlers.Count; i++)
-			{
-				int index = i;
-				var prev = orig;
-				orig = (weapon_, result_, eu_) => _hitSomethingHandlers[index](prev, weapon_, result_, eu_);
-			}
-		}
-		else
-		{
-			orig = cached;
-		}
+		_origStack ??= new Stack<Func<Weapon, SharedPhysics.CollisionResult, bool, bool>>();
+		_origStack.Push(Invoke_HitSomething<O, Weapon>(orig_));
 
-		return orig(weapon, result, eu);
+		try
+		{
+			var localChain = chain;
+			if (localChain == null)
+				return _origStack.Peek()(weapon, result, eu);
+			return localChain(weapon, result, eu);
+		}
+		finally
+		{
+			_origStack.Pop();
+		}
 	}
 	public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 		where O : Delegate
 		where W : Weapon
 	{
-		if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
-		{
-			return weapon_orig(weapon, result, eu);
-		}
-		else if (orig_ is On.Spear.orig_HitSomething spear_orig && weapon is Spear spear)
-		{
-			return spear_orig(spear, result, eu);
-		}
-		else if (orig_ is On.Rock.orig_HitSomething rock_orig && weapon is Rock rock)
-		{
-			return rock_orig(rock, result, eu);
-		}
-		else if (orig_ is On.ScavengerBomb.orig_HitSomething bomb_orig && weapon is ScavengerBomb bomb)
-		{
-			return bomb_orig(bomb, result, eu);
-		}
-		else if (ModManager.MSC && orig_ is On.MoreSlugcats.LillyPuck.orig_HitSomething lillyPuck_orig && weapon is LillyPuck lillyPuck)
-		{
-			return lillyPuck_orig(lillyPuck, result, eu);
-		}
-		else if (ModManager.Watcher && orig_ is On.Boomerang.orig_HitSomething boomerang_orig && weapon is Boomerang boomerang)
-		{
-			return boomerang_orig(boomerang, result, eu);
-		}
-		else if (orig_ is Func<W, SharedPhysics.CollisionResult, bool, bool> func)
-		{
-			return func(weapon, result, eu);
-		}
-		else
-		{
-			return (bool)orig_.DynamicInvoke(weapon, result, eu);
-		}
+		return Invoke_HitSomething<O, W>(orig_)(weapon, result, eu);
 	}
 	public static Func<W, SharedPhysics.CollisionResult, bool, bool> Invoke_HitSomething<O, W>(O orig_)
 		where O : Delegate

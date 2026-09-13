@@ -62,9 +62,10 @@ namespace MySlugcat
 		public bool ArcLightningAbility = false;
 		public bool CamouflageAbility = false;
 		public bool DeflagrationAbility = false;
+		public bool TrackingThrowAbility = false;
 
 
-		public PlayerModule(Player player)
+        public PlayerModule(Player player)
 		{
 			_playerRef = new WeakReference<Player>(player);
 
@@ -75,7 +76,8 @@ namespace MySlugcat
 				ArcLightningAbility = true;
 				CamouflageAbility = true;
 				DeflagrationAbility = true;
-			}
+                TrackingThrowAbility = true;
+            }
 		}
 	}
 
