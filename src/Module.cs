@@ -63,21 +63,23 @@ namespace MySlugcat
 		public bool CamouflageAbility = false;
 		public bool DeflagrationAbility = false;
 		public bool TrackingThrowAbility = false;
+		public bool ExtraGraspAbility = false;
 
 
-        public PlayerModule(Player player)
+		public PlayerModule(Player player)
 		{
 			_playerRef = new WeakReference<Player>(player);
 
-			if (player.slugcatStats.name == SlugcatStats.Name.White)
+            ExtraGraspAbility = true;
+            if (player.slugcatStats.name == SlugcatStats.Name.White)
 			{
 				PenetrationAbility = true;
 				FrameAbility = true;
 				ArcLightningAbility = true;
 				CamouflageAbility = true;
 				DeflagrationAbility = true;
-                TrackingThrowAbility = true;
-            }
+				TrackingThrowAbility = true;
+			}
 		}
 	}
 

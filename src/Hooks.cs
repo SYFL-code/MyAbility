@@ -34,9 +34,6 @@ namespace MySlugcat;
 
 public static class Hooks
 {
-	#region Creatures
-	#endregion
-
 	// 注册钩子
 	public static void RegisterHooks()
 	{
@@ -45,6 +42,8 @@ public static class Hooks
 
 		}
 		#endregion
+
+
 
 		#region Hooks
 		{
@@ -95,6 +94,43 @@ public static class Hooks
 			HookManager.Register(
 				Hook: () => HitSomething += ModuleHooks.Weapon_HitSomething,
 				UnHook: () => HitSomething -= ModuleHooks.Weapon_HitSomething
+			);
+		}
+		#endregion
+
+		#region ExtraGrasp
+		{
+			HookManager.Register(
+				Hook: () => On.Player.ctor += ExtraGrasp.Player_ctor,
+				UnHook: () => On.Player.ctor -= ExtraGrasp.Player_ctor
+			);
+			HookManager.Register(
+				Hook: () => On.Creature.SwitchGrasps += ExtraGrasp.Creature_SwitchGrasps,
+				UnHook: () => On.Creature.SwitchGrasps -= ExtraGrasp.Creature_SwitchGrasps
+			);
+			HookManager.Register(
+				Hook: () => On.Player.GrabUpdate += ExtraGrasp.Player_GrabUpdate,
+				UnHook: () => On.Player.GrabUpdate -= ExtraGrasp.Player_GrabUpdate
+			);
+			HookManager.Register(
+				Hook: () => IL.Player.GrabUpdate += ExtraGrasp.IL_Player_GrabUpdate,
+				UnHook: () => IL.Player.GrabUpdate -= ExtraGrasp.IL_Player_GrabUpdate
+			);
+			HookManager.Register(
+				Hook: () => On.PlayerGraphics.ThrowObject += ExtraGrasp.PlayerGraphics_ThrowObject,
+				UnHook: () => On.PlayerGraphics.ThrowObject -= ExtraGrasp.PlayerGraphics_ThrowObject
+			);
+			HookManager.Register(
+				Hook: () => On.Player.CanIPickThisUp += ExtraGrasp.Player_CanIPickThisUp,
+				UnHook: () => On.Player.CanIPickThisUp -= ExtraGrasp.Player_CanIPickThisUp
+			);
+			HookManager.Register(
+				Hook: () => On.Player.GraphicsModuleUpdated += ExtraGrasp.GraphicsModuleUpdated,
+				UnHook: () => On.Player.GraphicsModuleUpdated -= ExtraGrasp.GraphicsModuleUpdated
+			);
+			HookManager.Register(
+				Hook: () => On.Player.GetHeldItemDirection += ExtraGrasp.GetHeldItemDirection,
+				UnHook: () => On.Player.GetHeldItemDirection -= ExtraGrasp.GetHeldItemDirection
 			);
 		}
 		#endregion
