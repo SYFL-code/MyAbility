@@ -49,6 +49,24 @@ namespace MySlugcat.Ability
 				player.grasps = new Player.Grasp[player.grasps.Length + ExtraGraspsCount];
 			}
 		}
+		public static void PlayerGraphics_ctor(On.PlayerGraphics.orig_ctor orig, PlayerGraphics graphics, PhysicalObject ow)
+		{
+			orig.Invoke(graphics, ow);
+
+			if (ow is Player player)
+			{
+				player.GetModule(out var module);
+				if (module.ExtraGraspAbility)
+				{
+					Array.Resize(ref graphics.hands, graphics.hands.Length + ExtraGraspsCount);
+
+					for (int i = 2; i < graphics.hands.Length; i++)
+					{
+						graphics.hands[i] = graphics.hands[i % 2];
+					}
+				}
+			}
+		}
 
 		public static void Creature_SwitchGrasps(On.Creature.orig_SwitchGrasps orig, Creature creature, int a, int b)
 		{
@@ -57,25 +75,59 @@ namespace MySlugcat.Ability
 				player.GetModule(out var module);
 				if (module.ExtraGraspAbility)
 				{
-					// 保存最后一个
-					var last = player.grasps[player.grasps.Length - 1];
-
-					for (int i = player.grasps.Length - 1; i > 0; i--)
+					if (player.input[0].y > 0)
 					{
-						// 将每个元素 = 上一个元素
-						if (player.grasps[i] != null || player.grasps[i - 1] != null)
+						bool moved = false;
+						if (player.grasps[0] != null)
 						{
-							player.grasps[i] = player.grasps[i - 1];
+							for (int i = 0; i < player.grasps.Length; i++)
+							{
+								if (i >= 2)
+								{
+									if (player.grasps[i] == null)
+									{
+										player.grasps[i] = player.grasps[0];
+										player.grasps[0] = null;
+										moved = true;
+										break;
+									}
+								}
+							}
 						}
-					}
-					// 最后一个放到索引 0
-					if (player.grasps[0] != null || last != null)
-					{
-						player.grasps[0] = last;
-					}
-					player.UpdateGraspIndexes();
+						else
+						{
+							for (int i = 0; i < player.grasps.Length; i++)
+							{
+								if (i >= 2)
+								{
+									if (player.grasps[i] != null)
+									{
+										player.grasps[0] = player.grasps[i];
+										player.grasps[i] = null;
+										moved = true;
+										break;
+									}
+								}
+							}
+						}
 
-					return;
+						if (moved)
+						{
+							player.UpdateGraspIndexes();
+
+							return;
+						}
+						if (player.grasps[0] != null)
+						{
+							if (player.grasps.Length > 2)
+							{
+								orig(creature, 0, 2);
+
+								return;
+							}
+						}
+
+					}
 				}
 			}
 
@@ -189,22 +241,22 @@ namespace MySlugcat.Ability
 
 						grabbedChunk.MoveFromOutsideMyUpdate(eu, player.mainBodyChunk.pos + new Vector2(10f * toward, 10f));
 
-						//// 手部跟随图形模块的手
-						//if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics playerGraphics)
-						//{
-						//	//grabbedChunk.vel = playerGraphics.hands[i].vel;
-						//	//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[i].pos);
+						// 手部跟随图形模块的手
+						if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics playerGraphics)
+						{
+							//grabbedChunk.vel = playerGraphics.hands[i].vel;
+							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[i].pos);
 
-						//	grabbedChunk.vel = playerGraphics.hands[index].vel;
-						//	grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[index].pos + new Vector2(3 * toward, 3f));
-						//}
-						//// 如果抓着武器，设置其旋转方向与手一致，并停止旋转
-						//if (grabbed is Weapon grabbedWeapon)
-						//{
-						//	Vector2 heldItemDirection = player.GetHeldItemDirection(i);
-						//	grabbedWeapon.setRotation = new Vector2?(heldItemDirection);
-						//	grabbedWeapon.rotationSpeed = 0f;
-						//}
+							grabbedChunk.vel = playerGraphics.hands[index].vel;
+							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[index].pos + new Vector2(3 * toward, 3f));
+						}
+						// 如果抓着武器，设置其旋转方向与手一致，并停止旋转
+						if (grabbed is Weapon grabbedWeapon)
+						{
+							Vector2 heldItemDirection = player.GetHeldItemDirection(i);
+							grabbedWeapon.setRotation = new Vector2?(heldItemDirection);
+							grabbedWeapon.rotationSpeed = 0f;
+						}
 					}
 					else
 					{
@@ -264,6 +316,11 @@ namespace MySlugcat.Ability
 					}
 				}//
 
+				//if (player.input[0].pckp && !player.input[1].pckp && player.switchHandsProcess == 0f && !player.isSlugpup)
+				//{
+
+				//}
+
 				if (player.input[0].pckp && !player.input[1].pckp && player.switchHandsProcess == 0f && !player.isSlugpup)
 				{
 					bool flag5 = player.grasps[0] == null && player.grasps[1] == null;
@@ -295,42 +352,43 @@ namespace MySlugcat.Ability
 				}
 
 
-				int wantToThrow = player.wantToThrow;
-				if (wantToThrow > 0)
-				{
-					wantToThrow--;
-				}
-				if (player.input[0].thrw && !player.input[1].thrw && (!ModManager.MSC || !player.monkAscension))
-				{
-					wantToThrow = 5;
-				}
-				if (wantToThrow > 0)
-				{
-					if (ModManager.MSC && MMF.cfgOldTongue.Value && player.grasps[0] == null && player.grasps[1] == null && player.SaintTongueCheck())
-					{
-					}
-					else
-					{
-						if (player.grasps[0] == null && player.grasps[1] == null)
-						{
-							for (int i = 0; i < player.grasps.Length; i++)
-							{
-								if (i >= 2)
-								{
-									if (player.grasps[i] != null && player.IsObjectThrowable(player.grasps[i].grabbed))
-									{
-										player.ThrowObject(i, eu);
-										player.wantToThrow = 0;
-										wantToThrow = 0;
+				/*
+				//int wantToThrow = player.wantToThrow;
+				//if (wantToThrow > 0)
+				//{
+				//	wantToThrow--;
+				//}
+				//if (player.input[0].thrw && !player.input[1].thrw && (!ModManager.MSC || !player.monkAscension))
+				//{
+				//	wantToThrow = 5;
+				//}
+				//if (wantToThrow > 0)
+				//{
+				//	if (ModManager.MSC && MMF.cfgOldTongue.Value && player.grasps[0] == null && player.grasps[1] == null && player.SaintTongueCheck())
+				//	{
+				//	}
+				//	else
+				//	{
+				//		if (player.grasps[0] == null && player.grasps[1] == null)
+				//		{
+				//			for (int i = 0; i < player.grasps.Length; i++)
+				//			{
+				//				if (i >= 2)
+				//				{
+				//					if (player.grasps[i] != null && player.IsObjectThrowable(player.grasps[i].grabbed))
+				//					{
+				//						player.ThrowObject(i, eu);
+				//						player.wantToThrow = 0;
+				//						wantToThrow = 0;
 
-										break;
-									}
-								}
-							}
-						}
-					}
-				}
-
+				//						break;
+				//					}
+				//				}
+				//			}
+				//		}
+				//	}
+				//}
+				*/
 			}
 
 			orig(player, eu);
@@ -341,6 +399,52 @@ namespace MySlugcat.Ability
 			{
 				ILCursor c = new ILCursor(il);
 
+
+				// ThrowObject 投掷物体
+				// for (int num16 = 0; num16 < 2; num16++)
+				//IL_1d9f: ldloc.s 39
+				//IL_1da1: ldc.i4.1
+				//IL_1da2: add
+				//IL_1da3: stloc.s 39
+
+				// for (int num16 = 0; num16 < 2; num16++)
+				//IL_1da5: ldloc.s 39
+				//IL_1da7: ldc.i4.2
+				//IL_1da8: blt.s IL_1d6c
+				if (c.TryGotoNext(MoveType.Before,
+						i => i.MatchLdloc(39),
+						i => i.MatchLdcI4(2),
+						i => i.Match(OpCodes.Blt) || i.Match(OpCodes.Blt_S)))
+				{
+					// c 现在指向 ldloc.0，把它保留下来
+					c.GotoNext(MoveType.Before, i => i.MatchLdcI4(2));  // c 移到 ldc.i4.2 前
+					c.Remove();                                          // 只删 ldc.i4.2
+
+					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 length
+					c.Emit(OpCodes.Ldarg_0);
+					c.Emit(OpCodes.Call, typeof(Creature).GetProperty("grasps").GetGetMethod());
+					c.Emit(OpCodes.Ldlen);
+					c.Emit(OpCodes.Conv_I4);
+					//c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
+					// 栈变成 [i, length]，下一条 blt 正常判断 i < length
+
+					Log.LogInfo("[ThrowObject] loop bound -> grasps.Length");
+				}
+				else
+				{
+					Log.LogWarning("[ThrowObject] 未找到 i<2 的循环条件，跳过");
+				}
+
+				/*
+				if (this.animation == Player.AnimationIndex.DeepSwim)
+				{
+					if (base.grasps[0] == null && base.grasps[1] == null)
+					{
+						flag7 = false;
+					}
+				*/
+				/*
+				// CanReleaseObject 允许放下
 				// if (base.grasps[0] == null && base.grasps[1] == null)
 				//IL_1fbe: ldarg.0
 				//IL_1fbf: call instance class Creature/Grasp[] Creature::get_grasps()
@@ -357,48 +461,90 @@ namespace MySlugcat.Ability
 				// flag6 = false;
 				//IL_1fd2: ldc.i4.0
 				//IL_1fd3: stloc.s 43
+				//if (c.TryGotoNext(MoveType.Before,
+				//		i => i.MatchLdarg(0),
+				//		i => i.MatchCall<Creature>("get_grasps"),
+				//		i => i.MatchLdcI4(0),
+				//		i => i.MatchLdelemRef(),
+				//		i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue),
+
+				//		i => i.MatchLdarg(0),
+				//		i => i.MatchCall<Creature>("get_grasps"),
+				//		i => i.MatchLdcI4(1),
+				//		i => i.MatchLdelemRef(),
+				//		i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue),
+
+				//		i => i.MatchLdcI4(0),
+				//		i => i.MatchStloc(43)))
+				//{
+				//	for (int i = 0; i < 12; i++)
+				//	{
+				//		c.Remove();
+				//	}
+
+				//	//c.GotoNext(MoveType.Before, i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue));
+				//	//ILLabel? proceedCond = c.Next.Operand as ILLabel;//跳转指令.Operand  跳转处
+
+				//	//c.Remove();
+				//	//c.Emit(OpCodes.Br_S, proceedCond);
+
+
+
+				//	//c.GotoNext(MoveType.Before, i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue));
+				//	//ILLabel? proceedCond2 = c.Next.Operand as ILLabel;//跳转指令.Operand  跳转处
+
+				//	//c.Remove();
+				//	//c.Emit(OpCodes.Br_S, proceedCond2);
+
+				//	Log.LogInfo("[CanReleaseObject] loop bound -> null");
+				//}
+				//else
+				//{
+				//	Log.LogWarning("[CanReleaseObject] 未找到条件，跳过");
+				//}
+				*/
+
+
+
+
+				// ReleaseObject 放下
+				// for (int num22 = 0; num22 < 2; num22++)
+				//IL_21ab: ldloc.s 47
+				//IL_21ad: ldc.i4.1
+				//IL_21ae: add
+				//IL_21af: stloc.s 47
+
+				// for (int num22 = 0; num22 < 2; num22++)
+				//IL_21b1: ldloc.s 47
+				//IL_21b3: ldc.i4.2
+				//IL_21b4: blt.s IL_219a
 				if (c.TryGotoNext(MoveType.Before,
-						i => i.MatchLdarg(0),
-						i => i.MatchCall<Creature>("get_grasps"),
-						i => i.MatchLdcI4(0),
-						i => i.MatchLdelemRef(),
-						i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue),
-
-						i => i.MatchLdarg(0),
-						i => i.MatchCall<Creature>("get_grasps"),
-						i => i.MatchLdcI4(1),
-						i => i.MatchLdelemRef(),
-						i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue),
-
-						i => i.MatchLdcI4(0),
-						i => i.MatchStloc(43)))
+						i => i.MatchLdloc(47),
+						i => i.MatchLdcI4(2),
+						i => i.Match(OpCodes.Blt) || i.Match(OpCodes.Blt_S)))
 				{
-					if (c.TryGotoNext(MoveType.Before, i => i.MatchBrtrue(out _)))
-					{
-						c.Next.OpCode = c.Next.OpCode == OpCodes.Brtrue_S ? OpCodes.Br_S : OpCodes.Br;
-					}
-					if (c.TryGotoNext(MoveType.Before, i => i.MatchBrtrue(out _)))
-					{
-						c.Next.OpCode = c.Next.OpCode == OpCodes.Brtrue_S ? OpCodes.Br_S : OpCodes.Br;
-					}
-					//c.GotoNext(MoveType.Before, i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue));
-					//ILLabel? proceedCond = c.Prev.Operand as ILLabel;//跳转指令.Operand  跳转处
+					// c 现在指向 ldloc.0，把它保留下来
+					c.GotoNext(MoveType.Before, i => i.MatchLdcI4(2));  // c 移到 ldc.i4.2 前
+					c.Remove();                                          // 只删 ldc.i4.2
 
-					//c.Remove();
-					//c.Emit(OpCodes.Br_S, proceedCond);
+					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 length
+					c.Emit(OpCodes.Ldarg_0);
+					c.Emit(OpCodes.Call, typeof(Creature).GetProperty("grasps").GetGetMethod());
+					c.Emit(OpCodes.Ldlen);
+					c.Emit(OpCodes.Conv_I4);
+					//c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
+					// 栈变成 [i, length]，下一条 blt 正常判断 i < length
 
-
-
-					//c.GotoNext(MoveType.Before, i => i.Match(OpCodes.Brtrue_S) || i.Match(OpCodes.Brtrue));
-					//ILLabel? proceedCond2 = c.Prev.Operand as ILLabel;//跳转指令.Operand  跳转处
-
-					//c.Remove();
-					//c.Emit(OpCodes.Br_S, proceedCond2);
+					Log.LogInfo("[ReleaseObject] loop bound -> grasps.Length");
+				}
+				else
+				{
+					Log.LogWarning("[ReleaseObject] 未找到 i<2 的循环条件，跳过");
 				}
 
 
 
-
+				// SlugcatGrab 抓握
 				// for (int num28 = 0; num28 < 2; num28++)
 				//IL_285a: ldloc.s 54
 				//IL_285c: ldc.i4.1
@@ -426,12 +572,13 @@ namespace MySlugcat.Ability
 					//c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
 					// 栈变成 [i, length]，下一条 blt 正常判断 i < length
 
-					Log.LogInfo("loop bound -> grasps.Length");
+					Log.LogInfo("[SlugcatGrab] loop bound -> grasps.Length");
 				}
 				else
 				{
-					Log.LogWarning("未找到 i<2 的循环条件，跳过");
+					Log.LogWarning("[SlugcatGrab] 未找到 i<2 的循环条件，跳过");
 				}
+
 
 				if (Plugin.DebugMode)
 					Log.Instance.AppendLogText(il.ToString());
@@ -442,6 +589,66 @@ namespace MySlugcat.Ability
 			}
 		}
 
+		public static void IL_PlayerGraphics_Update(ILContext il)
+
+		{
+			try
+			{
+				ILCursor c = new ILCursor(il);
+
+
+				// TubeWorm
+				// for (int n = 0; n < player.grasps.Length; n++)
+				//IL_32f9: ldloc.s 37
+				//IL_32fb: ldc.i4.1
+				//IL_32fc: add
+				//IL_32fd: stloc.s 37
+
+				// for (int n = 0; n < player.grasps.Length; n++)
+				//IL_32ff: ldloc.s 37
+				//IL_3301: ldarg.0
+				//IL_3302: ldfld class Player PlayerGraphics::player
+				//IL_3307: callvirt instance class Creature/Grasp[] Creature::get_grasps()
+				//IL_330c: ldlen
+				//IL_330d: conv.i4
+				//IL_330e: blt IL_328e
+				if (c.TryGotoNext(MoveType.Before,
+						i => i.MatchLdloc(37),
+						i => i.MatchLdarg(0),
+						i => i.MatchLdfld<PlayerGraphics>("player"),
+						i => i.MatchCallOrCallvirt<Creature>("get_grasps"),
+						i => i.MatchLdlen(),
+						i => i.MatchConvI4(),
+						i => i.Match(OpCodes.Blt) || i.Match(OpCodes.Blt_S)))
+				{
+					// c 现在指向 ldloc.0，把它保留下来
+					c.GotoNext(MoveType.After, i => i.MatchLdloc(37));  // c 移到 ldloc.0 后
+					for (int i = 0; i < 5; i++)
+					{
+						c.Remove();
+					}
+
+					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 2
+					//IL_2862: ldc.i4.2
+					c.Emit(OpCodes.Ldc_I4_2);
+					// 栈变成 [i, 2]，下一条 blt 正常判断 i < 2
+
+					Log.LogInfo("[TubeWorm] loop bound -> 2");
+				}
+				else
+				{
+					Log.LogWarning("[TubeWorm] 未找到 i<player.grasps.Length 的循环条件，跳过");
+				}
+
+
+				if (Plugin.DebugMode)
+					Log.Instance.AppendLogText(il.ToString());
+			}
+			catch (Exception ex)
+			{
+				Log.Instance.AppendLogText($"Exception: {ex}");
+			}
+		}
 
 		public static Vector2 GetHeldItemDirection(On.Player.orig_GetHeldItemDirection orig, Player player, int hand)
 		{
@@ -483,20 +690,7 @@ namespace MySlugcat.Ability
 			return orig(player, hand);
 		}
 
-		public static void SwapGrasp(this Player player, int a, int b)
-		{
-			(player.grasps[a], player.grasps[b]) = (player.grasps[b], player.grasps[a]);
-
-			if (player.grasps[a]?.grabbed != null)
-			{
-				player.SlugcatGrab(player.grasps[a].grabbed, a);
-			}
-			if (player.grasps[b]?.grabbed != null)
-			{
-				player.SlugcatGrab(player.grasps[b].grabbed, b);
-			}
-		}
-
+		/*
 		//public static void Player_GraphicsModuleUpdated(ILContext il)
 		//{
 		//	try
@@ -536,11 +730,10 @@ namespace MySlugcat.Ability
 		//		Log.Instance.AppendLogText($"[Player_GraphicsModuleUpdated] Exception: {ex}");
 		//	}
 		//}
+		*/
 
-		/*
 		// SwallowObject
 		// GraphicsModuleUpdated
-		*/
 		/*
 		CraftingResults
 		SpitUpCraftedObject

@@ -105,6 +105,10 @@ public static class Hooks
 				UnHook: () => On.Player.ctor -= ExtraGrasp.Player_ctor
 			);
 			HookManager.Register(
+				Hook: () => On.PlayerGraphics.ctor += ExtraGrasp.PlayerGraphics_ctor,
+				UnHook: () => On.PlayerGraphics.ctor -= ExtraGrasp.PlayerGraphics_ctor
+			);
+			HookManager.Register(
 				Hook: () => On.Creature.SwitchGrasps += ExtraGrasp.Creature_SwitchGrasps,
 				UnHook: () => On.Creature.SwitchGrasps -= ExtraGrasp.Creature_SwitchGrasps
 			);
@@ -131,6 +135,10 @@ public static class Hooks
 			HookManager.Register(
 				Hook: () => On.Player.GetHeldItemDirection += ExtraGrasp.GetHeldItemDirection,
 				UnHook: () => On.Player.GetHeldItemDirection -= ExtraGrasp.GetHeldItemDirection
+			);
+			HookManager.Register(
+				Hook: () => IL.PlayerGraphics.Update += ExtraGrasp.IL_PlayerGraphics_Update,
+				UnHook: () => IL.PlayerGraphics.Update -= ExtraGrasp.IL_PlayerGraphics_Update
 			);
 		}
 		#endregion

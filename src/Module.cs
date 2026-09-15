@@ -70,7 +70,6 @@ namespace MySlugcat
 		{
 			_playerRef = new WeakReference<Player>(player);
 
-            ExtraGraspAbility = true;
             if (player.slugcatStats.name == SlugcatStats.Name.White)
 			{
 				PenetrationAbility = true;
@@ -80,6 +79,10 @@ namespace MySlugcat
 				DeflagrationAbility = true;
 				TrackingThrowAbility = true;
 			}
+			if (player.slugcatStats.name != SlugcatStats.Name.Yellow)
+			{
+                ExtraGraspAbility = true;
+            }
 		}
 	}
 
