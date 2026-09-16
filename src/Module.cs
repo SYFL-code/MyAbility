@@ -14,7 +14,6 @@ using Smoke;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -70,7 +69,7 @@ namespace MySlugcat
 		{
 			_playerRef = new WeakReference<Player>(player);
 
-            if (player.slugcatStats.name == SlugcatStats.Name.White)
+			if (player.slugcatStats.name == SlugcatStats.Name.White)
 			{
 				PenetrationAbility = true;
 				FrameAbility = true;
@@ -79,10 +78,10 @@ namespace MySlugcat
 				DeflagrationAbility = true;
 				TrackingThrowAbility = true;
 			}
-			if (player.slugcatStats.name != SlugcatStats.Name.Yellow)
+			if (Debugger.bools[2, true, "ExtraGraspAbility"])
 			{
-                ExtraGraspAbility = true;
-            }
+				ExtraGraspAbility = true;
+			}
 		}
 	}
 

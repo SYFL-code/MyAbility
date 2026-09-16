@@ -78,18 +78,22 @@ namespace MySlugcat.Ability
 					if (player.input[0].y > 0)
 					{
 						bool moved = false;
+
 						if (player.grasps[0] != null)
 						{
-							for (int i = 0; i < player.grasps.Length; i++)
+							if (player.grasps[0].grabbed is not Spear)
 							{
-								if (i >= 2)
+								for (int i = 0; i < player.grasps.Length; i++)
 								{
-									if (player.grasps[i] == null)
+									if (i >= 2)
 									{
-										player.grasps[i] = player.grasps[0];
-										player.grasps[0] = null;
-										moved = true;
-										break;
+										if (player.grasps[i] == null)
+										{
+											player.grasps[i] = player.grasps[0];
+											player.grasps[0] = null;
+											moved = true;
+											break;
+										}
 									}
 								}
 							}
@@ -117,13 +121,25 @@ namespace MySlugcat.Ability
 
 							return;
 						}
-						if (player.grasps[0] != null)
+						if (player.grasps[0] != null && player.grasps[0].grabbed is not Spear)
 						{
 							if (player.grasps.Length > 2)
 							{
 								orig(creature, 0, 2);
 
 								return;
+							}
+						}
+						else
+						{
+							if (player.grasps[1] != null && player.grasps[1].grabbed is not Spear)
+							{
+								if (player.grasps.Length > 2)
+								{
+									orig(creature, 1, 2);
+
+									return;
+								}
 							}
 						}
 
@@ -239,17 +255,22 @@ namespace MySlugcat.Ability
 						int index = i % 2;
 						float toward = (index == 0) ? (-1f) : 1f;
 
-						grabbedChunk.MoveFromOutsideMyUpdate(eu, player.mainBodyChunk.pos + new Vector2(10f * toward, 10f));
+						//grabbedChunk.MoveFromOutsideMyUpdate(eu, player.mainBodyChunk.pos + new Vector2(10f * toward, 10f));
+
 
 						// 手部跟随图形模块的手
 						if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics playerGraphics)
 						{
+							Vector2 anchor = playerGraphics.head.pos + new Vector2(10f * toward, 3f);
+							grabbedChunk.MoveFromOutsideMyUpdate(eu, anchor);
+
 							//grabbedChunk.vel = playerGraphics.hands[i].vel;
 							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[i].pos);
 
 							grabbedChunk.vel = playerGraphics.hands[index].vel;
 							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[index].pos + new Vector2(3 * toward, 3f));
 						}
+
 						// 如果抓着武器，设置其旋转方向与手一致，并停止旋转
 						if (grabbed is Weapon grabbedWeapon)
 						{
@@ -281,6 +302,18 @@ namespace MySlugcat.Ability
 					//{
 					//	num2++;
 					//}
+				}
+			}
+
+			player.GetModule(out var module);
+			if (module.ExtraGraspAbility)
+			{
+				if (player.grasps[0] != null && player.grasps[1] != null)
+				{
+					if (player.Grabability(obj) > Player.ObjectGrabability.OneHand)
+					{
+						return false;
+					}
 				}
 			}
 
@@ -400,6 +433,65 @@ namespace MySlugcat.Ability
 				ILCursor c = new ILCursor(il);
 
 
+				// GraspsCanBeCrafted 抓握可以制作
+				// if (ModManager.MSC && (FreeHand() == -1 || SlugCatClass == MoreSlugcatsEnums.SlugcatStatsName.Artificer) && GraspsCanBeCrafted())
+				//IL_05cf: ldsfld bool ModManager::MSC
+				//IL_05d4: brfalse.s IL_0605
+
+				//IL_05d6: ldarg.0
+				//IL_05d7: call instance int32 Player::FreeHand()
+				//IL_05dc: ldc.i4.m1
+				//IL_05dd: beq.s IL_05f1 // 跳进
+
+				//IL_05df: ldarg.0
+				//IL_05e0: ldfld class SlugcatStats/Name Player::SlugCatClass
+				//IL_05e5: ldsfld class SlugcatStats/Name MoreSlugcats.MoreSlugcatsEnums/SlugcatStatsName::Artificer
+				//IL_05ea: call bool class ExtEnum`1<class SlugcatStats/Name>::op_Equality(class ExtEnum`1<!0>, class ExtEnum`1<!0>)
+				////IL_05ef: brfalse.s IL_0605
+				if (c.TryGotoNext(MoveType.Before,
+					i => i.MatchLdsfld<ModManager>(nameof(ModManager.MSC)),
+					i => i.Match(OpCodes.Brfalse) || i.Match(OpCodes.Brfalse_S),
+
+					i => i.MatchLdarg(0),
+					i => i.MatchCall<Player>(nameof(Player.FreeHand)),
+					i => i.MatchLdcI4(-1),
+					i => i.Match(OpCodes.Beq) || i.Match(OpCodes.Beq_S)))
+				{
+					// c 现在指向 ldarg.0，把它保留下来
+					c.GotoNext(MoveType.After, i => i.MatchLdarg(0));  // 移到 ldarg.0 后
+					c.Remove();
+
+
+					c.EmitDelegate<Func<Player, int>>(player =>
+					{
+						player.GetModule(out var module);
+						if (module.ExtraGraspAbility)
+						{
+							if (player.grasps[0] != null && player.HeavyCarry(player.grasps[0].grabbed))
+							{
+								return -1;
+							}
+							for (int i = 0; i < 2; i++)
+							{
+								if (player.grasps[i] == null && (!player.isSlugpup || i != 1))
+								{
+									return i;
+								}
+							}
+							return -1;
+						}
+						return player.FreeHand();
+					});
+
+					Log.LogInfo("[GraspsCanBeCrafted] FreeHand() -> new FreeHand()");
+				}
+				else
+				{
+					Log.LogWarning("[GraspsCanBeCrafted] 未找到条件，跳过");
+				}
+
+
+
 				// ThrowObject 投掷物体
 				// for (int num16 = 0; num16 < 2; num16++)
 				//IL_1d9f: ldloc.s 39
@@ -422,7 +514,7 @@ namespace MySlugcat.Ability
 
 					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 length
 					c.Emit(OpCodes.Ldarg_0);
-					c.Emit(OpCodes.Call, typeof(Creature).GetProperty("grasps").GetGetMethod());
+					c.Emit(OpCodes.Call, typeof(Creature).GetProperty(nameof(Creature.grasps)).GetGetMethod());
 					c.Emit(OpCodes.Ldlen);
 					c.Emit(OpCodes.Conv_I4);
 					//c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
@@ -529,7 +621,7 @@ namespace MySlugcat.Ability
 
 					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 length
 					c.Emit(OpCodes.Ldarg_0);
-					c.Emit(OpCodes.Call, typeof(Creature).GetProperty("grasps").GetGetMethod());
+					c.Emit(OpCodes.Call, typeof(Creature).GetProperty(nameof(Creature.grasps)).GetGetMethod());
 					c.Emit(OpCodes.Ldlen);
 					c.Emit(OpCodes.Conv_I4);
 					//c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
@@ -566,7 +658,7 @@ namespace MySlugcat.Ability
 
 					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 length
 					c.Emit(OpCodes.Ldarg_0);
-					c.Emit(OpCodes.Call, typeof(Creature).GetProperty("grasps").GetGetMethod());
+					c.Emit(OpCodes.Call, typeof(Creature).GetProperty(nameof(Creature.grasps)).GetGetMethod());
 					c.Emit(OpCodes.Ldlen);
 					c.Emit(OpCodes.Conv_I4);
 					//c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
@@ -590,7 +682,6 @@ namespace MySlugcat.Ability
 		}
 
 		public static void IL_PlayerGraphics_Update(ILContext il)
-
 		{
 			try
 			{
@@ -615,8 +706,8 @@ namespace MySlugcat.Ability
 				if (c.TryGotoNext(MoveType.Before,
 						i => i.MatchLdloc(37),
 						i => i.MatchLdarg(0),
-						i => i.MatchLdfld<PlayerGraphics>("player"),
-						i => i.MatchCallOrCallvirt<Creature>("get_grasps"),
+						i => i.MatchLdfld<PlayerGraphics>(nameof(PlayerGraphics.player)),
+						i => i.MatchCallOrCallvirt<Creature>("get_" + nameof(Creature.grasps)),
 						i => i.MatchLdlen(),
 						i => i.MatchConvI4(),
 						i => i.Match(OpCodes.Blt) || i.Match(OpCodes.Blt_S)))
@@ -638,6 +729,83 @@ namespace MySlugcat.Ability
 				else
 				{
 					Log.LogWarning("[TubeWorm] 未找到 i<player.grasps.Length 的循环条件，跳过");
+				}
+
+
+				if (Plugin.DebugMode)
+					Log.Instance.AppendLogText(il.ToString());
+			}
+			catch (Exception ex)
+			{
+				Log.Instance.AppendLogText($"Exception: {ex}");
+			}
+		}
+		public static void IL_Player_SpitUpCraftedObject(ILContext il)
+
+		{
+			try
+			{
+				ILCursor c = new ILCursor(il);
+
+
+				// SpitUpCraftedObject grasps.Length
+				// for (int i = 0; i < base.grasps.Length; i++)
+				//IL_01ec: ldloc.1
+				//IL_01ed: ldc.i4.1
+				//IL_01ee: add
+				//IL_01ef: stloc.1
+
+				// for (int i = 0; i < base.grasps.Length; i++)
+				//IL_01f0: ldloc.1
+				//IL_01f1: ldarg.0
+				//IL_01f2: call instance class Creature/Grasp[] Creature::get_grasps()
+				//IL_01f7: ldlen
+				//IL_01f8: conv.i4
+				//IL_01f9: blt IL_003a
+
+
+
+				// for (int j = 0; j < base.grasps.Length; j++)
+				//IL_049f: ldloc.s 5
+				//IL_04a1: ldc.i4.1
+				//IL_04a2: add
+				//IL_04a3: stloc.s 5
+
+				//// for (int j = 0; j < base.grasps.Length; j++)
+				//IL_04a5: ldloc.s 5
+				//IL_04a7: ldarg.0
+				//IL_04a8: call instance class Creature/Grasp[] Creature::get_grasps()
+				//IL_04ad: ldlen
+				//IL_04ae: conv.i4
+				//IL_04af: blt IL_038d
+
+				int k = 0;
+				while (c.TryGotoNext(MoveType.Before,
+					//i => i.MatchLdloc(ldloc),
+					i => i.MatchLdarg(0),
+					i => i.MatchCallOrCallvirt<Creature>("get_" + nameof(Creature.grasps)),
+					i => i.MatchLdlen(),
+					i => i.MatchConvI4(),
+					i => i.Match(OpCodes.Blt) || i.Match(OpCodes.Blt_S)))
+				{
+					// c 现在指向 ldloc.0，把它保留下来
+					//c.GotoNext(MoveType.Before, i => i.MatchLdarg(0));  // c 移到 ldarg.0 前
+					for (int i = 0; i < 4; i++)
+					{
+						c.Remove();
+					}
+
+					// 此刻栈上已有 [i]（ldloc.0 已执行），压入 2
+					//IL_2862: ldc.i4.2
+					c.Emit(OpCodes.Ldc_I4_2);
+					// 栈变成 [i, 2]，下一条 blt 正常判断 i < 2
+
+					k++;
+					Log.LogInfo("[SpitUpCraftedObject] loop bound -> 2");
+				}
+				if (k == 0)
+				{
+					Log.LogWarning("[SpitUpCraftedObject] 未找到 i<player.grasps.Length 的循环条件，跳过");
 				}
 
 

@@ -113,6 +113,14 @@ public static class Hooks
 				UnHook: () => On.Creature.SwitchGrasps -= ExtraGrasp.Creature_SwitchGrasps
 			);
 			HookManager.Register(
+				Hook: () => IL.Player.SpitUpCraftedObject += ExtraGrasp.IL_Player_SpitUpCraftedObject,
+				UnHook: () => IL.Player.SpitUpCraftedObject -= ExtraGrasp.IL_Player_SpitUpCraftedObject
+			);
+			HookManager.Register(
+				Hook: () => IL.PlayerGraphics.Update += ExtraGrasp.IL_PlayerGraphics_Update,
+				UnHook: () => IL.PlayerGraphics.Update -= ExtraGrasp.IL_PlayerGraphics_Update
+			);
+			HookManager.Register(
 				Hook: () => On.Player.GrabUpdate += ExtraGrasp.Player_GrabUpdate,
 				UnHook: () => On.Player.GrabUpdate -= ExtraGrasp.Player_GrabUpdate
 			);
@@ -135,10 +143,6 @@ public static class Hooks
 			HookManager.Register(
 				Hook: () => On.Player.GetHeldItemDirection += ExtraGrasp.GetHeldItemDirection,
 				UnHook: () => On.Player.GetHeldItemDirection -= ExtraGrasp.GetHeldItemDirection
-			);
-			HookManager.Register(
-				Hook: () => IL.PlayerGraphics.Update += ExtraGrasp.IL_PlayerGraphics_Update,
-				UnHook: () => IL.PlayerGraphics.Update -= ExtraGrasp.IL_PlayerGraphics_Update
 			);
 		}
 		#endregion
