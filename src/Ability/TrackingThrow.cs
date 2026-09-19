@@ -40,7 +40,7 @@ namespace MySlugcat.Ability
 					if (vel.sqrMagnitude >= 0.01f)
 					{
 						List<Creature> candidates = Helper.FindCreaturesInCone(startPos, weapon.firstChunk.vel.normalized, weapon.room,
-							80f, 30f * 20f, [thrownBy], [thrownBy.GetType()], true);
+							80f, 30f * 20f, [thrownBy], [thrownBy.GetType()]);
 
 						if (candidates != null && candidates.Count > 0)
 						{

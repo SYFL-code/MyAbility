@@ -69,11 +69,24 @@ namespace MySlugcat.Ability
 			Vector2 creaturePos = new Vector2(creature.mainBodyChunk.pos.x, creature.mainBodyChunk.pos.y);
 			Vector2 targetPos = new Vector2(target.mainBodyChunk.pos.x, target.mainBodyChunk.pos.y);
 
-			creature.room.AddObject(new ExplosionSpikes(creature.room, creature.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, creature.ShortCutColor()));
-			creature.room.AddObject(new ShockWave(creature.mainBodyChunk.pos, 500f, 0.080f, 10, false));
+			try
+			{
+				creature.room.AddObject(new ExplosionSpikes(creature.room, creature.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, creature.ShortCutColor()));
+				creature.room.AddObject(new ShockWave(creature.mainBodyChunk.pos, 500f, 0.080f, 10, false));
 
-			target.room.AddObject(new ExplosionSpikes(target.room, target.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, target.ShortCutColor()));
-			target.room.AddObject(new ShockWave(target.mainBodyChunk.pos, 500f, 0.080f, 10, false));
+				target.room.AddObject(new ExplosionSpikes(target.room, target.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, target.ShortCutColor()));
+				target.room.AddObject(new ShockWave(target.mainBodyChunk.pos, 500f, 0.080f, 10, false));
+			}
+			catch (Exception e)
+			{
+				Log.LogError($"creature.room != null {creature.room != null}, creature.mainBodyChunk.pos != null {creature.mainBodyChunk.pos != null}");
+				Log.LogError($"creature.ShortCutColor() != null {creature.ShortCutColor() != null}");
+
+				Log.LogError($"target.room != null {target.room != null}, target.mainBodyChunk.pos != null {target.mainBodyChunk.pos != null}");
+				Log.LogError($"target.ShortCutColor() != null {target.ShortCutColor() != null}");
+
+				Log.LogError(e);
+			}
 
 			Teleport(creature, targetPos);
 			Teleport(target, creaturePos);

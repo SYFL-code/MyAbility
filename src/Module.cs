@@ -63,7 +63,7 @@ namespace MySlugcat
 		public bool DeflagrationAbility = false;
 		public bool TrackingThrowAbility = false;
 		public bool ExtraGraspAbility = false;
-
+		public bool HardeningAbility = false;
 
 		public PlayerModule(Player player)
 		{
@@ -77,6 +77,7 @@ namespace MySlugcat
 				CamouflageAbility = true;
 				DeflagrationAbility = true;
 				TrackingThrowAbility = true;
+				HardeningAbility = true;
 			}
 			if (Debugger.bools[2, true, "ExtraGraspAbility"])
 			{

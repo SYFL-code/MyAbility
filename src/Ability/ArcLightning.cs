@@ -54,7 +54,7 @@ namespace MySlugcat.Ability
 						if (stuckInObject != hitCreature || weaponModule.stuckInObjectTime > 30)
 						{
 							if (weapon is not Spear && player.GetModule().DeflagrationAbility && false) // false
-                            {
+							{
 								Log.LogInfo($"不触发");
 							}
 							else
@@ -94,7 +94,7 @@ namespace MySlugcat.Ability
 			direction = direction.normalized;
 
 			List<Creature> candidates = Helper.FindCreaturesInCone(startPos, direction, room,
-				ConeHalfAngle, ChainRadius, exclude, null, false);
+				ConeHalfAngle, ChainRadius, exclude, null, true);
 
 			if (candidates.Count == 0) return;
 			// 按距离排序

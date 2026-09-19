@@ -147,6 +147,19 @@ public static class Hooks
 		}
 		#endregion
 
+		#region Hardening
+		{
+			HookManager.Register(
+				Hook: () => On.Player.Update += Hardening.Player_Update,
+				UnHook: () => On.Player.Update -= Hardening.Player_Update
+			);
+			HookManager.Register(
+				Hook: () => HitSomething += Hardening.Hardening_HitSomething,
+				UnHook: () => HitSomething -= Hardening.Hardening_HitSomething
+			);
+		}
+		#endregion
+
 		#region TrackingThrow
 		{
 			HookManager.Register(
@@ -352,6 +365,9 @@ public static class Hooks
 		}
 	}
 
+
+
+	#region HitSomething
 	public static event Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> HitSomething
 	{
 		add
@@ -449,5 +465,6 @@ public static class Hooks
 			return (w, r, e) => (bool)orig_.DynamicInvoke(w, r, e);
 		}
 	}
+	#endregion
 
 }
