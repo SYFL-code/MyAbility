@@ -55,7 +55,7 @@ public sealed class Plugin : BaseUnityPlugin
 	#region Release & DEBUG
 #if DEBUG
 	public static bool DebugMode { get; } = true;
-	private static bool EnableStartScreen = true;
+    public static bool EnableStartScreen = true;
 	public static bool ForceLog { get; } = true;
 #else
 	public const bool DebugMode = false;

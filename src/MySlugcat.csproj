@@ -27,19 +27,16 @@
 
 	<ItemGroup>
 		<!-- 0. CommonUtils 共享文件 -->
-		<Compile Include="../../CommonUtils/src/**/*.cs"
-				 Exclude="../../CommonUtils/src/Zname/**/*.cs; ../../CommonUtils/src/obj/**/*.cs; ../../CommonUtils/src/bin/**/*.cs">
+		<Compile Include="../../CommonUtils/src/**/*.cs" Exclude="../../CommonUtils/src/Zname/**/*.cs; ../../CommonUtils/src/obj/**/*.cs; ../../CommonUtils/src/bin/**/*.cs">
 			<Link>CommonUtils/%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</Compile>
 
-		<Compile Condition="'$(Configuration)' == 'Debug'"
-				 Include="../../CommonUtils/src/Zname/**/*.cs">
+		<Compile Condition="'$(Configuration)' == 'Debug'" Include="../../CommonUtils/src/Zname/**/*.cs">
 			<Link>CommonUtils/Zname/%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</Compile>
 	
 		<!-- 1. 项目本地库 -->
-		<Reference Include="../../CommonUtils/lib/*.dll"
-				   Exclude="../../CommonUtils/lib/Newtonsoft.Json.dll">
+		<Reference Include="../../CommonUtils/lib/*.dll" Exclude="../../CommonUtils/lib/Newtonsoft.Json.dll">
 			<Private>false</Private>
 		</Reference>
 

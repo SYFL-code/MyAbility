@@ -304,6 +304,14 @@ public static class Hooks
 				Hook: () => On.Rock.HitSomething += ArcLightning.ArcLightning_HitSomething,
 				UnHook: () => On.Rock.HitSomething -= ArcLightning.ArcLightning_HitSomething
 			);
+			HookManager.Register(
+				Hook: () => On.Player.Update += ArcLightning.Player_Update,
+				UnHook: () => On.Player.Update -= ArcLightning.Player_Update
+			);
+			HookManager.Register(
+				Hook: () => On.Weapon.Thrown += ArcLightning.Weapon_Thrown,
+				UnHook: () => On.Weapon.Thrown -= ArcLightning.Weapon_Thrown
+			);
 		}
 		#endregion
 
