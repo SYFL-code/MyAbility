@@ -56,7 +56,7 @@ namespace MySlugcat.Ability
 						}
 					}
 
-					target.Violence(creature.mainBodyChunk, null, target.mainBodyChunk, null, Creature.DamageType.None, 0.1f, 60f);
+					target.Violence(creature.mainBodyChunk, null, target.mainBodyChunk, null, Creature.DamageType.None, 0.01f, 0f);
 
 					return true;
 				}
@@ -171,18 +171,26 @@ namespace MySlugcat.Ability
 				return orig_HitSomething(orig_, weapon, result, eu);
 			}
 
-			if (result.obj is Player player)
-			{
-				if (player.GetModule().FrameAbility)
-				{
-					Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player]);
 
-					if (target != null)
+			if (result.obj is Creature hitCreature)
+			{
+				hitCreature.GetModule(out var module);
+				if (module.FrameAbility)
+				{
+					if (!module.StalwartShellAbility || !hitCreature.GetStalwartShellModule().validity)
 					{
-						bool FrameResult = FrameTarget(player, target);
-						if (FrameResult)
+						Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
+							[hitCreature], [hitCreature.GetType(), typeof(Fly)]);
+
+						if (target != null)
 						{
-							result.obj = target;
+							bool FrameResult = FrameTarget(hitCreature, target);
+							if (FrameResult)
+							{
+								result.obj = target;
+								result.chunk = target.mainBodyChunk;
+								result.onAppendagePos = null;
+							}
 						}
 					}
 				}
@@ -200,9 +208,9 @@ namespace MySlugcat.Ability
 		public static void Creature_Violence(On.Creature.orig_Violence orig, Creature creature, BodyChunk? source, Vector2? directionAndMomentum,
 			BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
 		{
-			if (creature is Player player)
+			if (creature is Creature hitCreature)
 			{
-				if (player.GetModule().FrameAbility)
+				if (hitCreature.GetModule().FrameAbility)
 				{
 					if (type == Creature.DamageType.Bite ||
 						type == Creature.DamageType.Electric ||
@@ -239,13 +247,14 @@ namespace MySlugcat.Ability
 							{ }
 							else
 							{
-								Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, stowawayBug]);
+								Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
+									[hitCreature, stowawayBug], [hitCreature.GetType(), typeof(Fly)]);
 
-								bool FrameResult = FrameTarget(player, target);
+								bool FrameResult = FrameTarget(hitCreature, target);
 								if (FrameResult)
 								{
 									orig.Invoke(target, source, directionAndMomentum, target?.mainBodyChunk, null, type, damage, stunBonus);
-									player.stun = 0;
+									hitCreature.stun = 0;
 
 									return;
 								}
@@ -254,13 +263,14 @@ namespace MySlugcat.Ability
 
 						if (killer != null)
 						{
-							Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, killer]);
+							Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
+								[hitCreature, killer], [hitCreature.GetType(), typeof(Fly)]);
 
-							bool FrameResult = FrameTarget(player, target);
+							bool FrameResult = FrameTarget(hitCreature, target);
 							if (FrameResult)
 							{
 								orig.Invoke(target, source, directionAndMomentum, target?.mainBodyChunk, null, type, damage, stunBonus);
-								player.stun = 0;
+								hitCreature.stun = 0;
 
 								return;
 							}
@@ -277,15 +287,16 @@ namespace MySlugcat.Ability
 
 		public static void Lizard_Bite(On.Lizard.orig_Bite orig, Lizard lizard, BodyChunk chunk)
 		{
-			if (chunk?.owner is Player player)
+			if (chunk?.owner is Creature hitCreature)
 			{
-				if (player.GetModule().FrameAbility)
+				if (hitCreature.GetModule().FrameAbility)
 				{
-					Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, lizard]);
+					Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
+						[hitCreature, lizard], [hitCreature.GetType(), typeof(Fly)]);
 
 					if (target != null)
 					{
-						bool FrameResult = FrameTarget(player, target);
+						bool FrameResult = FrameTarget(hitCreature, target);
 						if (FrameResult)
 						{
 							chunk = target.mainBodyChunk;
@@ -299,15 +310,16 @@ namespace MySlugcat.Ability
 
 		public static void Vulture_Carry(On.Vulture.orig_Carry orig, Vulture vulture)
 		{
-			if (vulture.grasps?[0]?.grabbed is Player player)
+			if (vulture.grasps?[0]?.grabbed is Creature hitCreature)
 			{
-				if (player.GetModule().FrameAbility)
+				if (hitCreature.GetModule().FrameAbility)
 				{
-					Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player, vulture]);
+					Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
+						[hitCreature, vulture], [hitCreature.GetType(), typeof(Fly)]);
 
 					if (target != null)
 					{
-						bool FrameResult = FrameTarget(player, target);
+						bool FrameResult = FrameTarget(hitCreature, target);
 						if (FrameResult)
 						{
 							vulture.grasps[0].grabbed = target;
@@ -322,7 +334,8 @@ namespace MySlugcat.Ability
 
 		public static void Player_Die(On.Player.orig_Die orig, Player player)
 		{
-			if (player.GetModule().FrameAbility)
+			Creature hitCreature = player;
+			if (hitCreature.GetModule().FrameAbility)
 			{
 				Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player]);
 
@@ -341,7 +354,8 @@ namespace MySlugcat.Ability
 
 		public static void Player_Destroy(On.Player.orig_Destroy orig, Player player)
 		{
-			if (player.GetModule().FrameAbility)
+			Creature hitCreature = player;
+			if (hitCreature.GetModule().FrameAbility)
 			{
 				Creature? target = Helper.FindNearestCreature(player.mainBodyChunk.pos, player.room, [player]);
 

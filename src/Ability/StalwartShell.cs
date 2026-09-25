@@ -45,50 +45,54 @@ namespace MySlugcat.Ability
 
 			if (result.obj is Creature self)
 			{
-				self.GetStalwartShellModule(out var module);
-				if (module.StalwartShellAbility && module.validity)
+				if (self.GetModule().StalwartShellAbility && self.GetStalwartShellModule(out var module).validity)
 				{
-					Player? player = self as Player;
+					weapon.GetModule(out var weaponModule);
+					if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy &&
+						!thrownBy.GetModule().PenetrationAbility)
+					{
+						Player? player = self as Player;
 
-					//float weaponSpeed = weapon.firstChunk.vel.magnitude;// 一般为40f
+						//float weaponSpeed = weapon.firstChunk.vel.magnitude;// 一般为40f
 
-					//float chance = 0.01f;
-					//chance += weaponSpeed > 40f ? weaponSpeed  /1000f * 2 : 0f;
-					//chance += player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam ? 0.02f : 0f;
+						//float chance = 0.01f;
+						//chance += weaponSpeed > 40f ? weaponSpeed  /1000f * 2 : 0f;
+						//chance += player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam ? 0.02f : 0f;
 
-					//chance = Mathf.Clamp01(chance);
-					//if (UnityEngine.Random.value < chance)
-					//{
-					//	self.Stun(40);
-					//}
-					//if (player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam && UnityEngine.Random.value < 0.03f)
-					//{
-					//	self.Stun(1);
-					//}
+						//chance = Mathf.Clamp01(chance);
+						//if (UnityEngine.Random.value < chance)
+						//{
+						//	self.Stun(40);
+						//}
+						//if (player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam && UnityEngine.Random.value < 0.03f)
+						//{
+						//	self.Stun(1);
+						//}
 
-					//if (weaponSpeed < 60f || UnityEngine.Random.value < 0.10f)
-					//{
-					//	result.obj = null;
-					//	result.chunk = null;
-					//	result.onAppendagePos = null;
+						//if (weaponSpeed < 60f || UnityEngine.Random.value < 0.10f)
+						//{
+						//	result.obj = null;
+						//	result.chunk = null;
+						//	result.onAppendagePos = null;
 
-					//	HitAnotherPhysicalObject(player, weapon, false);
+						//	HitAnotherPhysicalObject(player, weapon, false);
 
-					//}
+						//}
 
-					self.Violence(weapon.firstChunk, weapon.firstChunk.vel * weapon.firstChunk.mass * 2f,
-						result.chunk, result.onAppendagePos,
-						Creature.DamageType.None, 0f, 0f);
+						self.Violence(weapon.firstChunk, weapon.firstChunk.vel * weapon.firstChunk.mass * 2f,
+							result.chunk, result.onAppendagePos,
+							Creature.DamageType.None, 0f, 0f);
 
-					result.obj = null;
-					result.chunk = null;
-					result.onAppendagePos = null;
+						result.obj = null;
+						result.chunk = null;
+						result.onAppendagePos = null;
 
-					HitAnotherPhysicalObject(self, weapon, false);
+						HitAnotherPhysicalObject(self, weapon, false);
 
-					module.lastHitOffset = weapon.firstChunk.pos - self.mainBodyChunk.pos;
-					HitEffect(self, weapon.firstChunk.pos + weapon.firstChunk.vel, weapon.firstChunk.vel);
-					AddDamage(self, weapon.HeavyWeapon ? 0.5f : 0.2f);
+						module.lastHitOffset = weapon.firstChunk.pos - self.mainBodyChunk.pos;
+						HitEffect(self, weapon.firstChunk.pos + weapon.firstChunk.vel, weapon.firstChunk.vel);
+						AddDamage(self, weapon.HeavyWeapon ? 0.5f : 0.2f);
+					}
 				}
 			}
 			return orig_HitSomething(orig_, weapon, result, eu);
@@ -102,9 +106,10 @@ namespace MySlugcat.Ability
 
 		public static void Creature_Update(On.Creature.orig_Update orig, Creature self, bool eu)
 		{
-			self.GetStalwartShellModule(out var module);
-			if (module.StalwartShellAbility)
+			if (self.GetModule().StalwartShellAbility)
 			{
+				self.GetStalwartShellModule(out var module);
+
 				bool lastValidity = module.validity;
 				if (module.validity)
 				{
@@ -284,9 +289,8 @@ namespace MySlugcat.Ability
 
 		public class StalwartShellModule
 		{
-			public bool StalwartShellAbility;
-			public float damage;
 			public bool validity = true;
+			public float damage;
 			public Vector2 lastHitOffset;
 
 			public bool initRestistances;
@@ -303,10 +307,9 @@ namespace MySlugcat.Ability
 
 				if (Plugin.DebugMode)
 				{
-					//StalwartShellAbility = true;
 					if (self is Player)
 					{
-						damage = -999;
+						damage = -9999;
 					}
 				}
 			}

@@ -147,6 +147,68 @@ public static class Hooks
 		}
 		#endregion
 
+		#region Frame
+		{
+			HookManager.Register(
+				Hook: () => On.Player.Die += Frame.Player_Die,
+				UnHook: () => On.Player.Die -= Frame.Player_Die
+			);
+			HookManager.Register(
+				Hook: () => On.Player.Destroy += Frame.Player_Destroy,
+				UnHook: () => On.Player.Destroy -= Frame.Player_Destroy
+			);
+			HookManager.Register(
+				Hook: () => On.Lizard.Bite += Frame.Lizard_Bite,
+				UnHook: () => On.Lizard.Bite -= Frame.Lizard_Bite
+			);
+			HookManager.Register(
+				Hook: () => On.Vulture.Carry += Frame.Vulture_Carry,
+				UnHook: () => On.Vulture.Carry -= Frame.Vulture_Carry
+			);
+			HookManager.Register(
+				Hook: () => On.Creature.Violence += Frame.Creature_Violence,
+				UnHook: () => On.Creature.Violence -= Frame.Creature_Violence
+			);
+		}
+		{
+			// HitSomething
+			HookManager.Register(
+				Hook: () => HitSomething += Frame.Frame_HitSomething,
+				UnHook: () => HitSomething -= Frame.Frame_HitSomething
+			);
+			//HookManager.Register(
+			//	Hook: () => On.Weapon.HitSomething += Frame.Frame_HitSomething,
+			//	UnHook: () => On.Weapon.HitSomething -= Frame.Frame_HitSomething
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.Spear.HitSomething += Frame.Frame_HitSomething,
+			//	UnHook: () => On.Spear.HitSomething -= Frame.Frame_HitSomething
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.Rock.HitSomething += Frame.Frame_HitSomething,
+			//	UnHook: () => On.Rock.HitSomething -= Frame.Frame_HitSomething
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.ScavengerBomb.HitSomething += Frame.Frame_HitSomething,
+			//	UnHook: () => On.ScavengerBomb.HitSomething -= Frame.Frame_HitSomething
+			//);
+			//if (ModManager.MSC)
+			//{
+			//	HookManager.Register(
+			//		Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Frame.Frame_HitSomething,
+			//		UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Frame.Frame_HitSomething
+			//	);
+			//}
+			//if (ModManager.Watcher)
+			//{
+			//	HookManager.Register(
+			//		Hook: () => On.Boomerang.HitSomething += Frame.Frame_HitSomething,
+			//		UnHook: () => On.Boomerang.HitSomething -= Frame.Frame_HitSomething
+			//	);
+			//}
+		}
+		#endregion
+
 		#region StalwartShell
 		{
 			HookManager.Register(
@@ -157,6 +219,52 @@ public static class Hooks
 				Hook: () => HitSomething += StalwartShell.StalwartShell_HitSomething,
 				UnHook: () => HitSomething -= StalwartShell.StalwartShell_HitSomething
 			);
+		}
+		#endregion
+
+		#region Penetration
+		{
+			HookManager.Register(
+				Hook: () => On.Weapon.HitAnotherThrownWeapon += Penetration.Weapon_HitAnotherThrownWeapon,
+				UnHook: () => On.Weapon.HitAnotherThrownWeapon -= Penetration.Weapon_HitAnotherThrownWeapon
+			);
+		}
+		{
+			// HitSomething
+			HookManager.Register(
+				Hook: () => HitSomething += Penetration.PenetrateHit,
+				UnHook: () => HitSomething -= Penetration.PenetrateHit
+			);
+			//HookManager.Register(
+			//	Hook: () => On.Weapon.HitSomething += Penetration.PenetrateHit,
+			//	UnHook: () => On.Weapon.HitSomething -= Penetration.PenetrateHit
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.Spear.HitSomething += Penetration.PenetrateHit,
+			//	UnHook: () => On.Spear.HitSomething -= Penetration.PenetrateHit
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.Rock.HitSomething += Penetration.PenetrateHit,
+			//	UnHook: () => On.Rock.HitSomething -= Penetration.PenetrateHit
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.ScavengerBomb.HitSomething += Penetration.PenetrateHit,
+			//	UnHook: () => On.ScavengerBomb.HitSomething -= Penetration.PenetrateHit
+			//);
+			//if (ModManager.MSC)
+			//{
+			//	HookManager.Register(
+			//		Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Penetration.PenetrateHit,
+			//		UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Penetration.PenetrateHit
+			//	);
+			//}
+			//if (ModManager.Watcher)
+			//{
+			//	HookManager.Register(
+			//		Hook: () => On.Boomerang.HitSomething += Penetration.PenetrateHit,
+			//		UnHook: () => On.Boomerang.HitSomething -= Penetration.PenetrateHit
+			//	);
+			//}
 		}
 		#endregion
 
@@ -232,128 +340,33 @@ public static class Hooks
 		//}
 		#endregion
 
-		#region Frame
-		{
-			HookManager.Register(
-				Hook: () => On.Player.Die += Frame.Player_Die,
-				UnHook: () => On.Player.Die -= Frame.Player_Die
-			);
-			HookManager.Register(
-				Hook: () => On.Player.Destroy += Frame.Player_Destroy,
-				UnHook: () => On.Player.Destroy -= Frame.Player_Destroy
-			);
-			HookManager.Register(
-				Hook: () => On.Lizard.Bite += Frame.Lizard_Bite,
-				UnHook: () => On.Lizard.Bite -= Frame.Lizard_Bite
-			);
-			HookManager.Register(
-				Hook: () => On.Vulture.Carry += Frame.Vulture_Carry,
-				UnHook: () => On.Vulture.Carry -= Frame.Vulture_Carry
-			);
-			HookManager.Register(
-				Hook: () => On.Creature.Violence += Frame.Creature_Violence,
-				UnHook: () => On.Creature.Violence -= Frame.Creature_Violence
-			);
-		}
-		{
-			// HitSomething
-			HookManager.Register(
-				Hook: () => On.Weapon.HitSomething += Frame.Frame_HitSomething,
-				UnHook: () => On.Weapon.HitSomething -= Frame.Frame_HitSomething
-			);
-			HookManager.Register(
-				Hook: () => On.Spear.HitSomething += Frame.Frame_HitSomething,
-				UnHook: () => On.Spear.HitSomething -= Frame.Frame_HitSomething
-			);
-			HookManager.Register(
-				Hook: () => On.Rock.HitSomething += Frame.Frame_HitSomething,
-				UnHook: () => On.Rock.HitSomething -= Frame.Frame_HitSomething
-			);
-			HookManager.Register(
-				Hook: () => On.ScavengerBomb.HitSomething += Frame.Frame_HitSomething,
-				UnHook: () => On.ScavengerBomb.HitSomething -= Frame.Frame_HitSomething
-			);
-			if (ModManager.MSC)
-			{
-				HookManager.Register(
-					Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Frame.Frame_HitSomething,
-					UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Frame.Frame_HitSomething
-				);
-			}
-			if (ModManager.Watcher)
-			{
-				HookManager.Register(
-					Hook: () => On.Boomerang.HitSomething += Frame.Frame_HitSomething,
-					UnHook: () => On.Boomerang.HitSomething -= Frame.Frame_HitSomething
-				);
-			}
-		}
-		#endregion
-
 		#region ArcLightning
 		{
 			HookManager.Register(
-				Hook: () => On.Weapon.HitSomething += ArcLightning.ArcLightning_HitSomething,
-				UnHook: () => On.Weapon.HitSomething -= ArcLightning.ArcLightning_HitSomething
+				Hook: () => HitSomething += ArcLightning.ArcLightning_HitSomething,
+				UnHook: () => HitSomething -= ArcLightning.ArcLightning_HitSomething
 			);
+			//HookManager.Register(
+			//	Hook: () => On.Weapon.HitSomething += ArcLightning.ArcLightning_HitSomething,
+			//	UnHook: () => On.Weapon.HitSomething -= ArcLightning.ArcLightning_HitSomething
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.Spear.HitSomething += ArcLightning.ArcLightning_HitSomething,
+			//	UnHook: () => On.Spear.HitSomething -= ArcLightning.ArcLightning_HitSomething
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.Rock.HitSomething += ArcLightning.ArcLightning_HitSomething,
+			//	UnHook: () => On.Rock.HitSomething -= ArcLightning.ArcLightning_HitSomething
+			//);
+
 			HookManager.Register(
-				Hook: () => On.Spear.HitSomething += ArcLightning.ArcLightning_HitSomething,
-				UnHook: () => On.Spear.HitSomething -= ArcLightning.ArcLightning_HitSomething
-			);
-			HookManager.Register(
-				Hook: () => On.Rock.HitSomething += ArcLightning.ArcLightning_HitSomething,
-				UnHook: () => On.Rock.HitSomething -= ArcLightning.ArcLightning_HitSomething
-			);
-			HookManager.Register(
-				Hook: () => On.Player.Update += ArcLightning.Player_Update,
-				UnHook: () => On.Player.Update -= ArcLightning.Player_Update
+				Hook: () => On.Creature.Update += ArcLightning.Creature_Update,
+				UnHook: () => On.Creature.Update -= ArcLightning.Creature_Update
 			);
 			HookManager.Register(
 				Hook: () => On.Weapon.Thrown += ArcLightning.Weapon_Thrown,
 				UnHook: () => On.Weapon.Thrown -= ArcLightning.Weapon_Thrown
 			);
-		}
-		#endregion
-
-		#region Penetration
-		{
-			HookManager.Register(
-				Hook: () => On.Weapon.HitAnotherThrownWeapon += Penetration.Weapon_HitAnotherThrownWeapon,
-				UnHook: () => On.Weapon.HitAnotherThrownWeapon -= Penetration.Weapon_HitAnotherThrownWeapon
-			);
-		}
-		{
-			// HitSomething
-			HookManager.Register(
-				Hook: () => On.Weapon.HitSomething += Penetration.PenetrateHit,
-				UnHook: () => On.Weapon.HitSomething -= Penetration.PenetrateHit
-			);
-			HookManager.Register(
-				Hook: () => On.Spear.HitSomething += Penetration.PenetrateHit,
-				UnHook: () => On.Spear.HitSomething -= Penetration.PenetrateHit
-			);
-			HookManager.Register(
-				Hook: () => On.Rock.HitSomething += Penetration.PenetrateHit,
-				UnHook: () => On.Rock.HitSomething -= Penetration.PenetrateHit
-			);
-			HookManager.Register(
-				Hook: () => On.ScavengerBomb.HitSomething += Penetration.PenetrateHit,
-				UnHook: () => On.ScavengerBomb.HitSomething -= Penetration.PenetrateHit
-			);
-			if (ModManager.MSC)
-			{
-				HookManager.Register(
-					Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Penetration.PenetrateHit,
-					UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Penetration.PenetrateHit
-				);
-			}
-			if (ModManager.Watcher)
-			{
-				HookManager.Register(
-					Hook: () => On.Boomerang.HitSomething += Penetration.PenetrateHit,
-					UnHook: () => On.Boomerang.HitSomething -= Penetration.PenetrateHit
-				);
-			}
 		}
 		#endregion
 

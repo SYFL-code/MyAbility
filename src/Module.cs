@@ -1,5 +1,6 @@
 ﻿using CommonUtils.Core;
 using HarmonyLib;
+using IL;
 using ImprovedInput;
 using Menu.Remix;
 using Mono.Cecil;
@@ -41,6 +42,16 @@ namespace MySlugcat
 			return module;
 		}
 
+		public static CreatureModule GetModule(this Creature creature)
+		{
+			return ModuleManager.Get<Creature, CreatureModule>(creature, c => new CreatureModule(c));
+		}
+		public static CreatureModule GetModule(this Creature creature, out CreatureModule module)
+		{
+			module = GetModule(creature);
+			return module;
+		}
+
 		public static WeaponModule GetModule(this Weapon weapon)
 		{
 			return ModuleManager.Get(weapon, w => new WeaponModule(w));
@@ -56,12 +67,12 @@ namespace MySlugcat
 	{
 		private WeakReference<Player> _playerRef;
 
-		public bool PenetrationAbility = false;
-		public bool FrameAbility = false;
-		public bool ArcLightningAbility = false;
+		//public bool PenetrationAbility = false;
+		//public bool FrameAbility = false;
+		//public bool ArcLightningAbility = false;
 		public bool CamouflageAbility = false;
-		public bool DeflagrationAbility = false;
-		public bool TrackingThrowAbility = false;
+		//public bool DeflagrationAbility = false;
+		//public bool TrackingThrowAbility = false;
 		public bool ExtraGraspAbility = false;
 
 		public PlayerModule(Player player)
@@ -70,16 +81,52 @@ namespace MySlugcat
 
 			if (player.slugcatStats.name == SlugcatStats.Name.White)
 			{
-				PenetrationAbility = true;
-				FrameAbility = true;
-				ArcLightningAbility = true;
+				//PenetrationAbility = true;
+				//FrameAbility = true;
+				//ArcLightningAbility = true;
 				CamouflageAbility = true;
-				DeflagrationAbility = true;
-				TrackingThrowAbility = true;
+				//DeflagrationAbility = true;
+				//TrackingThrowAbility = true;
 			}
 			if (Debugger.bools[2, true, "ExtraGraspAbility"])
 			{
 				ExtraGraspAbility = true;
+			}
+		}
+	}
+
+	public class CreatureModule
+	{
+		private WeakReference<Creature> _creatureRef;
+
+		public bool PenetrationAbility = false;
+		public bool FrameAbility = false;
+		public bool ArcLightningAbility = false;
+		public bool DeflagrationAbility = false;
+		public bool StalwartShellAbility = false;
+		public bool TrackingThrowAbility = false;
+
+		public CreatureModule(Creature creature)
+		{
+			_creatureRef = new WeakReference<Creature>(creature);
+
+			if (Plugin.DebugMode)
+			{
+				if (creature is Player player)
+				{
+					if (player.slugcatStats.name == SlugcatStats.Name.White)
+					{
+						PenetrationAbility = true;
+						FrameAbility = true;
+						ArcLightningAbility = true;
+						DeflagrationAbility = true;
+						TrackingThrowAbility = true;
+					}
+				}
+				else
+				{
+					StalwartShellAbility = true;
+				}
 			}
 		}
 	}

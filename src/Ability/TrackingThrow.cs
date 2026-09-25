@@ -26,13 +26,13 @@ namespace MySlugcat.Ability
 	// 追踪投掷
 	public static class TrackingThrow
 	{
-		public static void Weapon_Thrown(On.Weapon.orig_Thrown orig, Weapon weapon, Creature thrownBy, Vector2 thrownPos,
+		public static void Weapon_Thrown(On.Weapon.orig_Thrown orig, Weapon weapon, Creature _thrownBy, Vector2 thrownPos,
 			Vector2? firstFrameTraceFromPos, IntVector2 throwDir, float frc, bool eu)
 		{
 			weapon.GetModule(out var weaponModule);
-			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Player player)
+			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy)
 			{
-				if (player.GetModule().TrackingThrowAbility)
+				if (thrownBy.GetModule().TrackingThrowAbility)
 				{
 					Vector2 startPos = weapon.firstChunk.pos;
 					Vector2 vel = weapon.firstChunk.vel;
@@ -77,7 +77,7 @@ namespace MySlugcat.Ability
 				}
 			}
 
-			orig(weapon, thrownBy, thrownPos, firstFrameTraceFromPos, throwDir, frc, eu);
+			orig(weapon, _thrownBy, thrownPos, firstFrameTraceFromPos, throwDir, frc, eu);
 		}
 
 	}

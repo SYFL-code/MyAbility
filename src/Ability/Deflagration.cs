@@ -147,9 +147,9 @@ namespace MySlugcat.Ability
 			}
 
 			weapon.GetModule(out var weaponModule);
-			if (weaponModule.Owner.TryGetTarget(out var target) && target is Player player)
+			if (weaponModule.Owner.TryGetTarget(out var target) && target is Creature thrownBy)
 			{
-				if (player.GetModule().DeflagrationAbility)
+				if (thrownBy.GetModule().DeflagrationAbility)
 				{
 					if (result.obj is Creature hitCreature)
 					{
@@ -160,7 +160,7 @@ namespace MySlugcat.Ability
 							if (weapon is Spear)
 							{
 								percentage = 12;
-								if (player.GetModule().ArcLightningAbility)
+								if (thrownBy.GetModule().ArcLightningAbility)
 								{
 									percentage = 0.1f;
 								}
@@ -188,7 +188,7 @@ namespace MySlugcat.Ability
 
 							if (percentage > UnityEngine.Random.Range(0, 100))
 							{
-								Explode(weapon, result.chunk, player);
+								Explode(weapon, result.chunk, thrownBy);
 							}
 						}
 					}
@@ -210,7 +210,8 @@ namespace MySlugcat.Ability
 			orig(player);
 
 
-			if (!wasDead && player.dead && player.GetModule().DeflagrationAbility)
+			Creature creature = player;
+			if (!wasDead && player.dead && creature.GetModule().DeflagrationAbility)
 			{
 				if (100 > UnityEngine.Random.Range(0, 100))
 				{
