@@ -23,13 +23,217 @@ using UnityEngine;
 using Watcher;
 using static Menu.Remix.InternalOI;
 using static MonoMod.InlineRT.MonoModRule;
-using static MySlugcat.Ability.Hardening;
+using Color = UnityEngine.Color;
+using Random = UnityEngine.Random;
 
 namespace MySlugcat.Ability
 {
 	// 电弧连锁
 	public static class ArcLightning
 	{
+		public static bool ArcLightning_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
+			where O : Delegate
+			where W : Weapon
+		{
+			if (result.obj == null)
+			{
+				return orig_HitSomething(orig_, weapon, result, eu);
+			}
+			if (result.obj.abstractPhysicalObject.rippleLayer != weapon.abstractPhysicalObject.rippleLayer &&
+				!result.obj.abstractPhysicalObject.rippleBothSides && !weapon.abstractPhysicalObject.rippleBothSides)
+			{
+				return orig_HitSomething(orig_, weapon, result, eu);
+			}
+
+			weapon.GetModule(out var weaponModule);
+			if (weaponModule.Owner.TryGetTarget(out var target) && target is Player player)
+			{
+				if (player.GetModule().ArcLightningAbility)
+				{
+					if (result.obj is Creature hitCreature)
+					{
+						weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
+						if (stuckInObject != hitCreature || weaponModule.stuckInObjectTime > 30)
+						{
+							List<Creature> exclude = [player];
+							// 执行连锁
+							ArcTriggerChain(weapon, hitCreature, player, weapon.firstChunk.vel.normalized, ref exclude, 5);
+						}
+					}
+				}
+			}
+			return orig_HitSomething(orig_, weapon, result, eu);
+		}
+		public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
+			where O : Delegate
+			where W : Weapon
+		{
+			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
+		}
+
+
+		public static float ChainRadius = 14f * 20f; // 14格
+		public static int MaxTargets = 5;
+		public static float Damage = 0.2f;
+		public static float StunBonus = 60f;
+		public static float ConeHalfAngle = 60f;           // 半角，总角度为120°
+
+		private static void ArcTriggerChain(Weapon weapon, Creature start, Player player, Vector2 direction, ref List<Creature> exclude, int remainingChains)
+		{
+			if (remainingChains <= 0) return;
+
+			Room room = start.room;
+			if (room == null) return;
+
+			room.PlaySound(SoundID.Jelly_Fish_Tentacle_Stun, start.firstChunk);
+
+			SpawnChargedAuraBurst(start);
+			UpdateChargedAuraPositions(start);
+
+
+			Vector2 startPos = start.mainBodyChunk.pos;
+			direction = direction.normalized;
+
+			List<Creature> candidates = Helper.FindCreaturesInCone(startPos, direction, room,
+				ConeHalfAngle, ChainRadius, exclude, null, true);
+
+			if (candidates.Count == 0) return;
+			// 按距离排序
+			candidates.SortDistance(startPos);
+
+
+			int count = Math.Min(Math.Min(candidates.Count, UnityEngine.Random.Range(1, 4)), remainingChains);
+
+			for (int i = 0; i < count; i++)
+			{
+				Creature target = candidates[i];
+				Vector2 targetPos = target.mainBodyChunk.pos;
+				exclude.Add(target);
+
+
+				bool isElectricCreature = CheckElectricCreature(start);
+				if (isElectricCreature || UnityEngine.Random.value < 0.025f)
+				{
+					Recharge(weapon, start, target, player);
+					remainingChains += 3;
+				}
+
+
+				float stunBonus = (target is not Player) ? (120f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 80f;
+				if (target is not BigEel && !isElectricCreature)
+				{
+					// 施加电击伤害和眩晕
+					target.Violence(player.firstChunk,
+						Custom.DirVec(start.firstChunk.pos, target.firstChunk.pos) * 5f,
+						target.firstChunk,
+						null,
+						Creature.DamageType.Electric,
+						0.1f,
+						stunBonus);
+
+					//target.Violence(player.firstChunk,
+					//	new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 0.5f),
+					//	target.mainBodyChunk,
+					//	null,
+					//	Creature.DamageType.Electric,
+					//	Damage,
+					//	StunBonus);
+
+					room.AddObject(new CreatureSpasmer(target, true, target.stun));
+				}
+
+				// 视觉特效
+				room.AddObject(new LightningLine(start, target, 4f));
+				SpawnLightningEffect(room, startPos, targetPos);
+				//room.AddObject(new ExplosionSpikes(room, target.mainBodyChunk.pos, 8, 20f, 5f, 5f, 120f, target.ShortCutColor()));
+
+
+				direction = (targetPos - startPos).normalized;
+
+				for (int j = 0; j < Mathf.Pow(UnityEngine.Random.value, 4f) * 3; j++)
+				{
+					ArcTriggerChain(weapon, target, player, direction, ref exclude, remainingChains - 1);
+				}
+			}
+		}
+
+		// 生成电弧特效（简单火花线）
+		private static void SpawnLightningEffect(Room room, Vector2 from, Vector2 to)
+		{
+			int steps = 10;
+			for (int i = 0; i <= steps; i++)
+			{
+				float t = i / (float)steps;
+				Vector2 pos = Vector2.Lerp(from, to, t);
+				// 加一点随机偏移，更像电弧
+				pos += Custom.RNV() * 2f;
+				room.AddObject(new Spark(pos, Custom.RNV() * 3f, Color.white, null, 6, 30));
+			}
+		}
+
+		public static void Recharge(Weapon weapon, Creature start, Creature target, Player player)
+		{
+			Room room = target.room;
+
+			room.PlaySound(SoundID.Jelly_Fish_Tentacle_Stun, target.firstChunk);
+			room.AddObject(new Explosion.ExplosionLight(target.firstChunk.pos, 200f, 1f, 4, new Color(0.7f, 1f, 1f)));
+			Spark(target);
+			Zap(target, player);
+			room.AddObject(new ZapCoil.ZapFlash(target.firstChunk.pos, 25f));
+		}
+		public static void Spark(Creature target)
+		{
+			Room room = target.room;
+
+			//room.AddObject(new LightningRing(target, 18f));
+			//for (int i = 0; i < target.bodyChunks.Length; i++)
+			//{
+			//	Vector2 pos = target.bodyChunks[i].pos;
+			//	for (int j = 0; j < 8; j++)
+			//	{
+			//		Vector2 dir = Custom.DegToVec(j * 45f);
+			//		room.AddObject(new Spark(pos + (dir * 5f), dir * 0.1f, Color.blue, null, 5, UnityEngine.Random.Range(8, 12)));
+			//	}
+			//}
+
+
+			//if (base.abstractSpear.electricCharge == 0)
+			//{
+			//	return;
+			//}
+			for (int i = 0; i < 10; i++)
+			{
+				Vector2 vector = Custom.RNV();
+				room.AddObject(new Spark(target.firstChunk.pos + (vector * (UnityEngine.Random.value * 20f)),
+					vector * Mathf.Lerp(4f, 10f, UnityEngine.Random.value),
+					Color.white, null, 4, 18));
+			}
+		}
+		public static void Zap(Creature target, Creature thrownBy)
+		{
+			Room room = target.room;
+
+			float zapPitch = 4f + (UnityEngine.Random.value * 3f);
+
+			//if (base.abstractSpear.electricCharge == 0)
+			//{
+			//    return;
+			//}
+			room.AddObject(new ZapCoil.ZapFlash(target.firstChunk.pos, 10f));
+			room.PlaySound(SoundID.Zapper_Zap, target.firstChunk, false, 1f, (zapPitch == 0f) ? (1.5f + (UnityEngine.Random.value * 1.5f)) : zapPitch);
+			if (target.Submersion > 0.5f)
+			{
+				room.AddObject(new UnderwaterShock(room, null, target.firstChunk.pos, 10, 800f, 2f, thrownBy, new Color(0.8f, 0.8f, 1f)));
+			}
+		}
+
+		public static bool CheckElectricCreature(Creature otherObject)
+		{
+			return otherObject is Centipede || otherObject is BigJellyFish || otherObject is Inspector;
+		}
+
+
+
 		public static void Player_Update(On.Player.orig_Update orig, Player player, bool eu)
 		{
 			orig(player, eu);
@@ -45,19 +249,35 @@ namespace MySlugcat.Ability
 					return;
 				}
 
-				UpdateChargedAuraPositions(player);
+				//UpdateChargedAuraPositions(player);
 
-				module.chargedAuraTimer--;
-				if (module.chargedAuraTimer <= 0)
-				{
-					SpawnChargedAuraBurst(player);
-					module.chargedAuraTimer = UnityEngine.Random.Range(28, 49);
-				}
+				//module.chargedAuraTimer--;
+				//if (module.chargedAuraTimer <= 0)
+				//{
+				//	SpawnChargedAuraBurst(player);
+				//	module.chargedAuraTimer = UnityEngine.Random.Range(28, 49);
+				//}
+
 
 				if (UnityEngine.Random.value < 0.025f)
 				{
-					Spark(player);
+					player.room.AddObject(new ElectricArcCosmetic(player,
+						radius: 35f, life: Random.Range(0.08f, 0.2f), width: Random.Range(1.5f, 3f)));
+
+					player.room.PlaySound(SoundID.Death_Lightning_Spark_Spontaneous, player.mainBodyChunk.pos, 0.32f, UnityEngine.Random.Range(1.05f, 1.35f));
+					//Spark(player);
 				}
+
+				//for (int i = 0; i < player.grasps.Length; i++)
+				//{
+				//	if (player.grasps[i]?.grabbed is Weapon weapon)
+				//	{
+				//		if (UnityEngine.Random.value < 0.025f)
+				//		{
+				//			player.room.AddObject(new WeaponArcField(weapon, 80f));
+				//		}
+				//	}
+				//}
 			}
 		}
 
@@ -136,7 +356,6 @@ namespace MySlugcat.Ability
 			}
 			creature.room.PlaySound(SoundID.Death_Lightning_Spark_Spontaneous, vector4, 0.32f, UnityEngine.Random.Range(1.05f, 1.35f));
 		}
-
 		private static void GetBodyBoundedArc(Creature creature, Vector2 axis, out Vector2 start, out Vector2 end)
 		{
 			axis.Normalize();
@@ -155,12 +374,16 @@ namespace MySlugcat.Ability
 			Vector2 vector = new Vector2((num + num2) * 0.5f, (num3 + num4) * 0.5f);
 			float num5 = Mathf.Max(18f, (((num2 - num) * 0.5f) + 12f) * 1.8f);
 			float num6 = Mathf.Max(18f, (((num4 - num3) * 0.5f) + 12f) * 1.8f);
+			if (creature is Player)
+			{
+				num5 = Mathf.Max(18f, (((num2 - num) * 0.5f) + 12f) * 1.2f);
+				num6 = Mathf.Max(18f, (((num4 - num3) * 0.5f) + 12f) * 1.2f);
+			}
 			float num7 = Mathf.Sqrt((axis.x * axis.x / (num5 * num5)) + (axis.y * axis.y / (num6 * num6)));
 			float num8 = (num7 > 0.0001f) ? (1f / num7) : Mathf.Min(num5, num6);
 			start = vector - (axis * num8);
 			end = vector + (axis * num8);
 		}
-
 		private static void UpdateChargedAuraPositions(Creature creature)
 		{
 			creature.GetArcLightningModule(out var module);
@@ -183,212 +406,6 @@ namespace MySlugcat.Ability
 		#endregion
 
 
-
-		public static bool ArcLightning_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
-			where O : Delegate
-			where W : Weapon
-		{
-			if (result.obj == null)
-			{
-				return orig_HitSomething(orig_, weapon, result, eu);
-			}
-			if (result.obj.abstractPhysicalObject.rippleLayer != weapon.abstractPhysicalObject.rippleLayer &&
-				!result.obj.abstractPhysicalObject.rippleBothSides && !weapon.abstractPhysicalObject.rippleBothSides)
-			{
-				return orig_HitSomething(orig_, weapon, result, eu);
-			}
-
-			weapon.GetModule(out var weaponModule);
-			if (weaponModule.Owner.TryGetTarget(out var target) && target is Player player)
-			{
-				if (player.GetModule().ArcLightningAbility)
-				{
-					if (result.obj is Creature hitCreature)
-					{
-						weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
-						if (stuckInObject != hitCreature || weaponModule.stuckInObjectTime > 30)
-						{
-							if (weapon is not Spear && player.GetModule().DeflagrationAbility && false) // false
-							{
-								Log.LogInfo($"不触发");
-							}
-							else
-							{
-								List<Creature> exclude = [player];
-								// 执行连锁
-								ArcTriggerChain(weapon, hitCreature, player, weapon.firstChunk.vel.normalized, ref exclude, 5);
-							}
-						}
-					}
-				}
-			}
-			return orig_HitSomething(orig_, weapon, result, eu);
-		}
-		public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
-			where O : Delegate
-			where W : Weapon
-		{
-			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
-		}
-
-
-		public static float ChainRadius = 14f * 20f; // 14格
-		public static int MaxTargets = 5;
-		public static float Damage = 0.2f;
-		public static float StunBonus = 60f;
-		public static float ConeHalfAngle = 60f;           // 半角，总角度为120°
-
-		private static void ArcTriggerChain(Weapon weapon, Creature start, Player player, Vector2 direction, ref List<Creature> exclude, int remainingChains)
-		{
-			if (remainingChains <= 0) return;
-
-			Room room = start.room;
-			if (room == null) return;
-
-			room.PlaySound(SoundID.Jelly_Fish_Tentacle_Stun, start.firstChunk);
-
-			SpawnChargedAuraBurst(start);
-			UpdateChargedAuraPositions(start);
-
-
-			Vector2 startPos = start.mainBodyChunk.pos;
-			direction = direction.normalized;
-
-			List<Creature> candidates = Helper.FindCreaturesInCone(startPos, direction, room,
-				ConeHalfAngle, ChainRadius, exclude, null, true);
-
-			if (candidates.Count == 0) return;
-			// 按距离排序
-			candidates.Sort((a, b) =>
-			{
-				float da = Vector2.Distance(startPos, a.mainBodyChunk.pos);
-				float db = Vector2.Distance(startPos, b.mainBodyChunk.pos);
-				return da.CompareTo(db);
-			});
-
-
-
-			int count = Math.Min(Math.Min(candidates.Count, UnityEngine.Random.Range(1, 4)), remainingChains);
-
-			for (int i = 0; i < count; i++)
-			{
-				Creature target = candidates[i];
-				Vector2 targetPos = target.mainBodyChunk.pos;
-				exclude.Add(target);
-
-
-				bool isElectricCreature = CheckElectricCreature(start);
-				if (isElectricCreature || UnityEngine.Random.value < 0.025f)
-				{
-					Recharge(weapon, start, target, player);
-					remainingChains += 3;
-				}
-
-
-				float stunBonus = (target is not Player) ? (120f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 80f;
-				if (target is not BigEel && !isElectricCreature)
-				{
-					// 施加电击伤害和眩晕
-					target.Violence(player.firstChunk,
-						new Vector2?(Custom.DirVec(start.firstChunk.pos, target.firstChunk.pos) * 5f),
-						target.firstChunk,
-						null,
-						Creature.DamageType.Electric,
-						0.1f,
-						stunBonus);
-
-					room.AddObject(new CreatureSpasmer(target, false, target.stun));
-
-
-					//target.Violence(player.firstChunk,
-					//	new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 0.5f),
-					//	target.mainBodyChunk,
-					//	null,
-					//	Creature.DamageType.Electric,
-					//	Damage,
-					//	StunBonus);
-				}
-
-				// 视觉特效
-				room.AddObject(new LightningLine(start, target, stunBonus));
-				SpawnLightningEffect(room, startPos, targetPos);
-				//room.AddObject(new ExplosionSpikes(room, target.mainBodyChunk.pos, 8, 20f, 5f, 5f, 120f, target.ShortCutColor()));
-
-
-				direction = (targetPos - startPos).normalized;
-
-				for (int j = 0; j < Mathf.Pow(UnityEngine.Random.value, 4f) * 3; j++)
-				{
-					ArcTriggerChain(weapon, target, player, direction, ref exclude, remainingChains - 1);
-				}
-			}
-		}
-
-		// 生成电弧特效（简单火花线）
-		private static void SpawnLightningEffect(Room room, Vector2 from, Vector2 to)
-		{
-			int steps = 10;
-			for (int i = 0; i <= steps; i++)
-			{
-				float t = i / (float)steps;
-				Vector2 pos = Vector2.Lerp(from, to, t);
-				// 加一点随机偏移，更像电弧
-				pos += Custom.RNV() * 2f;
-				room.AddObject(new Spark(pos, Custom.RNV() * 3f, Color.white, null, 6, 30));
-			}
-		}
-
-		public static void Recharge(Weapon weapon, Creature start, Creature target, Player player)
-		{
-			Room room = target.room;
-
-			room.PlaySound(SoundID.Jelly_Fish_Tentacle_Stun, target.firstChunk);
-			room.AddObject(new Explosion.ExplosionLight(target.firstChunk.pos, 200f, 1f, 4, new Color(0.7f, 1f, 1f)));
-			Spark(target);
-			Zap(target, player);
-			room.AddObject(new ZapCoil.ZapFlash(target.firstChunk.pos, 25f));
-		}
-		public static void Spark(Creature target)
-		{
-			Room room = target.room;
-
-			//if (base.abstractSpear.electricCharge == 0)
-			//{
-			//	return;
-			//}
-			for (int i = 0; i < 10; i++)
-			{
-				Vector2 vector = Custom.RNV();
-				room.AddObject(new Spark(target.firstChunk.pos + (vector * (UnityEngine.Random.value * 20f)),
-					vector * Mathf.Lerp(4f, 10f, UnityEngine.Random.value),
-					Color.white, null, 4, 18));
-			}
-		}
-		public static void Zap(Creature target, Creature thrownBy)
-		{
-			Room room = target.room;
-
-			float zapPitch = 4f + (UnityEngine.Random.value * 3f);
-
-			//if (base.abstractSpear.electricCharge == 0)
-			//{
-			//    return;
-			//}
-			room.AddObject(new ZapCoil.ZapFlash(target.firstChunk.pos, 10f));
-			room.PlaySound(SoundID.Zapper_Zap, target.firstChunk, false, 1f, (zapPitch == 0f) ? (1.5f + (UnityEngine.Random.value * 1.5f)) : zapPitch);
-			if (target.Submersion > 0.5f)
-			{
-				room.AddObject(new UnderwaterShock(room, null, target.firstChunk.pos, 10, 800f, 2f, thrownBy, new Color(0.8f, 0.8f, 1f)));
-			}
-		}
-
-		public static bool CheckElectricCreature(Creature otherObject)
-		{
-			return otherObject is Centipede || otherObject is BigJellyFish || otherObject is Inspector;
-		}
-
-
-
 		public class LightningLine : CosmeticSprite
 		{
 			public WeakReference<Creature> start;
@@ -403,24 +420,36 @@ namespace MySlugcat.Ability
 			private float lastLife;
 			private float lifeTime;
 
-			// ==== 电弧动画参数 ====
-			private const int SegmentCount = 10;     // 电弧段数（线段数量）
-			private const float BaseThickness = 2.5f;   // 核心线宽（像素）
-			private const float GlowThickness = 7f;     // 光晕线宽（像素）
-			private const float JitterAmount = 7f;     // 垂直抖动幅度（像素）
-			private const int RegenInterval = 2;      // 每 N 帧重新生成一次抖动目标
-			private const float OffsetSmooth = 0.35f;  // 抖动插值系数
+			// ===== 电弧参数 =====
+			private const int MainSegments = 10;    // 主链线段数
+			private const int ForkSegments = 4;     // 分叉线段数
+			private const float BaseThickness = 2.6f;  // 核心线宽
+			private const float GlowThickness = 10f;   // 光晕线宽
+			private const float JitterAmount = 9f;    // 主链抖动幅度
+			private const float ForkJitter = 6f;    // 分叉抖动幅度
+			private const float WalkDamp = 0.55f; // 随机游走衰减（越小越锐）
+			private const int RegenInterval = 3;     // 每 N 帧换一次形状
+			private const float StartRadius = 6f;    // 端点从体表推出去的距离
+			private const float ForkLengthRatio = 0.32f; // 分叉长度 / 主链长
+			private const float ForkChance = 0.75f; // 出现分叉的概率
 
-			// 每个节点的垂直偏移，0 号是起点，SegmentCount 号是终点
-			private float[] offsets;        // 当前偏移
-			private float[] lastOffsets;    // 上一帧偏移
-			private float[] targetOffsets;  // 目标偏移
+			// 主链 / 分叉的垂直偏移
+			private float[] offsets;
+			private float[] forkOffsets;
+
+			// 分叉状态
+			private bool hasFork;
+			private int forkParent;    // 从主链哪一段分叉
+			private float forkDirBias;   // 分叉相对主链方向的偏转（垂直分量）
+
 			private int regenCounter;
 			private float flickerSeed;
 
 			// 精灵缓存
-			private FSprite[] glowSprites = [];
-			private FSprite[] coreSprites = [];
+			private FSprite[] glowSprites = [];      // 主链光晕
+			private FSprite[] coreSprites = [];      // 主链核心
+			private FSprite[] forkGlowSprites = [];  // 分叉光晕
+			private FSprite[] forkCoreSprites = [];  // 分叉核心
 
 			public LightningLine(Creature start, Creature target, float lifeTime)
 			{
@@ -432,42 +461,57 @@ namespace MySlugcat.Ability
 				this.targetPos = target.mainBodyChunk.pos;
 				this.lastTargetPos = target.mainBodyChunk.lastPos;
 
-				this.lifeTime = lifeTime;
+				// 建议传 6 ~ 10。闪电不像绳子，就是几帧的事
+				this.lifeTime = Mathf.Max(1f, lifeTime);
 				this.life = 0f;
 				this.lastLife = 0f;
 
-				int pointCount = SegmentCount + 1;
+				int pointCount = MainSegments + 1;
 				offsets = new float[pointCount];
-				lastOffsets = new float[pointCount];
-				targetOffsets = new float[pointCount];
+				forkOffsets = new float[ForkSegments + 1];
 
-				GenerateTargetOffsets();
+				// 随机决定是否分叉
+				hasFork = UnityEngine.Random.value < ForkChance;
+				forkParent = UnityEngine.Random.Range(2, MainSegments - 2);
+				forkDirBias = UnityEngine.Random.Range(-0.7f, 0.7f);
+
+				RegenerateOffsets();
 
 				flickerSeed = UnityEngine.Random.value * 100f;
 				regenCounter = 0;
 			}
 
-			/// <summary>生成一次"锯齿"目标偏移。端点保持 0，中间点用正弦包络约束，最后去均值避免整体歪斜。</summary>
-			private void GenerateTargetOffsets()
+			/// <summary>
+			/// 生成一次折角偏移。用"随机游走 + 均值回归"，让相邻节点差值累计，
+			/// 形成锐利的 V 形折角，同时避免整条线飘出屏幕。
+			/// </summary>
+			private void RegenerateOffsets()
 			{
-				int pointCount = SegmentCount + 1;
-				for (int i = 0; i < pointCount; i++)
+				int pointCount = MainSegments + 1;
+
+				// 主链：端点固定为 0，中间随机游走
+				offsets[0] = 0f;
+				offsets[pointCount - 1] = 0f;
+				float acc = 0f;
+				for (int i = 1; i < pointCount - 1; i++)
 				{
-					if (i == 0 || i == pointCount - 1)
-					{
-						targetOffsets[i] = 0f;
-						continue;
-					}
-					float t = i / (float)(pointCount - 1);
-					float taper = Mathf.Sin(t * Mathf.PI); // 两端小、中间大
-					targetOffsets[i] = UnityEngine.Random.Range(-JitterAmount, JitterAmount) * taper;
+					acc += UnityEngine.Random.Range(-JitterAmount, JitterAmount) * 0.9f;
+					acc *= WalkDamp;
+					offsets[i] = acc;
 				}
 
-				// 去均值，避免整条线朝一侧弯
-				float sum = 0f;
-				for (int i = 0; i < pointCount; i++) sum += targetOffsets[i];
-				float avg = sum / pointCount;
-				for (int i = 0; i < pointCount; i++) targetOffsets[i] -= avg;
+				// 分叉：同理，但从主链节点出发，起点固定为 0
+				if (hasFork)
+				{
+					forkOffsets[0] = 0f;
+					float facc = 0f;
+					for (int i = 1; i <= ForkSegments; i++)
+					{
+						facc += UnityEngine.Random.Range(-ForkJitter, ForkJitter) * 0.9f;
+						facc *= WalkDamp;
+						forkOffsets[i] = facc;
+					}
+				}
 			}
 
 			public override void Update(bool eu)
@@ -483,178 +527,361 @@ namespace MySlugcat.Ability
 					return;
 				}
 
-				if (start.TryGetTarget(out Creature startCreature))
+				// 端点位置跟踪
+				if (start.TryGetTarget(out Creature sc))
 				{
 					lastStartPos = startPos;
-					startPos = startCreature.mainBodyChunk.pos;
+					startPos = sc.mainBodyChunk.pos;
 				}
-
-				if (target.TryGetTarget(out Creature targetCreature))
+				if (target.TryGetTarget(out Creature tc))
 				{
 					lastTargetPos = targetPos;
-					targetPos = targetCreature.mainBodyChunk.pos;
+					targetPos = tc.mainBodyChunk.pos;
 				}
 
-				// 偏移向目标平滑靠拢
-				for (int i = 0; i < offsets.Length; i++)
-				{
-					lastOffsets[i] = offsets[i];
-					offsets[i] = Mathf.Lerp(offsets[i], targetOffsets[i], OffsetSmooth);
-				}
-
-				// 周期性抖动
+				// 周期性换形，直接覆盖（跳变，不插值）
 				regenCounter++;
 				if (regenCounter >= RegenInterval)
 				{
 					regenCounter = 0;
-					GenerateTargetOffsets();
+					RegenerateOffsets();
 				}
 			}
 
 			public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
 			{
-				int n = SegmentCount;
-				glowSprites = new FSprite[n];
-				coreSprites = new FSprite[n];
+				int total = (MainSegments + ForkSegments) * 2;
+				sLeaser.sprites = new FSprite[total];
 
-				sLeaser.sprites = new FSprite[n * 2];
+				glowSprites = new FSprite[MainSegments];
+				coreSprites = new FSprite[MainSegments];
+				forkGlowSprites = new FSprite[ForkSegments];
+				forkCoreSprites = new FSprite[ForkSegments];
 
-				for (int i = 0; i < n; i++)
+				Color glowColor = new Color(0.4f, 0.75f, 1f);
+
+				int idx = 0;
+				for (int i = 0; i < MainSegments; i++)
 				{
-					FSprite glow = new FSprite("Futile_White")
-					{
-						anchorX = 0f,
-						anchorY = 0.5f,
-						color = new Color(0.4f, 0.75f, 1f),
-						alpha = 0.5f,
-						//shader = rCam.game.rainWorld.Shaders["Additive"],
-					};
-					FSprite core = new FSprite("Futile_White")
-					{
-						anchorX = 0f,
-						anchorY = 0.5f,
-						color = Color.white,
-					};
-
-					glowSprites[i] = glow;
-					coreSprites[i] = core;
-
-					sLeaser.sprites[i] = glow;
-					sLeaser.sprites[n + i] = core;
+					glowSprites[i] = MakeSprite(glowColor, 0.5f);
+					coreSprites[i] = MakeSprite(Color.white, 1f);
+					sLeaser.sprites[idx++] = glowSprites[i];
+					sLeaser.sprites[idx++] = coreSprites[i];
+				}
+				for (int i = 0; i < ForkSegments; i++)
+				{
+					forkGlowSprites[i] = MakeSprite(glowColor, 0.5f);
+					forkCoreSprites[i] = MakeSprite(Color.white, 1f);
+					sLeaser.sprites[idx++] = forkGlowSprites[i];
+					sLeaser.sprites[idx++] = forkCoreSprites[i];
 				}
 
 				AddToContainer(sLeaser, rCam, null);
+			}
+
+			private static FSprite MakeSprite(Color color, float alpha)
+			{
+				return new FSprite("Futile_White")
+				{
+					anchorX = 0f,     // 从起点向终点延伸
+					anchorY = 0.5f,   // 绕中心旋转
+					color = color,
+					alpha = alpha,
+					// 如果运行时报错，把下面这行注释掉即可
+					// shader = rCam.game.rainWorld.Shaders["Additive"],
+				};
 			}
 
 			public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
 			{
 				base.DrawSprites(sLeaser, rCam, timeStacker, camPos);
 
-				int n = SegmentCount;
-				int pointCount = n + 1;
+				int pointCount = MainSegments + 1;
 
-				// 端点失效则隐藏所有精灵
+				// 端点失效 → 全部隐藏
 				if (!start.TryGetTarget(out _) || !target.TryGetTarget(out _))
 				{
-					for (int i = 0; i < sLeaser.sprites.Length; i++)
-						sLeaser.sprites[i].isVisible = false;
+					HideAll(sLeaser);
 					return;
 				}
 
-				// 两端位置插值
+				// 端点位置插值
 				Vector2 interpStart = Vector2.Lerp(lastStartPos, startPos, timeStacker);
 				Vector2 interpTarget = Vector2.Lerp(lastTargetPos, targetPos, timeStacker);
+
+				// 往体表推出去，看起来是从身体表面放电
+				Vector2 baseDir = interpTarget - interpStart;
+				if (baseDir.sqrMagnitude < 0.0001f)
+				{
+					HideAll(sLeaser);
+					return;
+				}
+				interpStart += (interpStart - interpTarget).normalized * StartRadius;
+				interpTarget += (interpTarget - interpStart).normalized * StartRadius;
 
 				Vector2 dir = interpTarget - interpStart;
 				float len = dir.magnitude;
 				if (len < 0.01f)
 				{
-					for (int i = 0; i < sLeaser.sprites.Length; i++)
-						sLeaser.sprites[i].isVisible = false;
+					HideAll(sLeaser);
 					return;
 				}
 				Vector2 dirNorm = dir / len;
 				Vector2 perp = new Vector2(-dirNorm.y, dirNorm.x);
 
-				// 生命周期 & 闪烁
+				// 生命周期 → alpha
 				float interpLife = Mathf.Lerp(lastLife, life, timeStacker);
 				float fadeAlpha = Mathf.Clamp01(1f - interpLife);
-
-				float flicker = 0.75f + (Mathf.PerlinNoise(Time.time * 30f, flickerSeed) * 0.5f);
-				if (interpLife > 0.7f)
-				{
-					// 消散时随机快速闪烁
-					flicker *= (UnityEngine.Random.value > 0.5f) ? 1f : 0.3f;
-				}
+				float flicker = 0.7f + (Mathf.PerlinNoise(Time.time * 45f, flickerSeed) * 0.6f);
 				float alpha = Mathf.Clamp01(fadeAlpha * flicker);
 
-				// 计算所有节点
+				// 颜色：白 → 淡蓝
+				Color coreColor = Color.Lerp(Color.white, new Color(0.6f, 0.8f, 1f), interpLife);
+
+				// ===== 计算主链节点 =====
 				Vector2[] pts = new Vector2[pointCount];
 				for (int i = 0; i < pointCount; i++)
 				{
 					float t = i / (float)(pointCount - 1);
 					Vector2 straight = Vector2.Lerp(interpStart, interpTarget, t);
-					float off = Mathf.Lerp(lastOffsets[i], offsets[i], timeStacker);
-					pts[i] = straight + (perp * off);
+					pts[i] = straight + (perp * offsets[i]);
 				}
 
-				// 颜色随生命从白 → 淡蓝
-				Color coreColor = Color.Lerp(Color.white, new Color(0.6f, 0.8f, 1f), interpLife);
-
-				// 更新每段
-				for (int i = 0; i < n; i++)
+				// ===== 画主链（两端细、中间粗）=====
+				for (int i = 0; i < MainSegments; i++)
 				{
-					Vector2 a = pts[i];
-					Vector2 b = pts[i + 1];
-					Vector2 seg = b - a;
-					float segLen = seg.magnitude;
+					float tt = i / (float)(MainSegments - 1);
+					float taper = 0.55f + (0.7f * Mathf.Sin(tt * Mathf.PI)); // 0.55 → 1.25 → 0.55
+					DrawSegment(glowSprites[i], coreSprites[i], pts[i], pts[i + 1],
+						BaseThickness * taper, GlowThickness * taper,
+						alpha, coreColor, camPos);
+				}
 
-					FSprite glow = glowSprites[i];
-					FSprite core = coreSprites[i];
+				// ===== 画分叉（从根部到尖端逐渐变细）=====
+				if (hasFork)
+				{
+					Vector2 forkRoot = pts[forkParent];
+					Vector2 segDir = (pts[forkParent + 1] - forkRoot).normalized;
+					Vector2 forkDir = (segDir + (perp * forkDirBias)).normalized;
+					float forkLen = len * ForkLengthRatio;
 
-					if (segLen < 0.01f)
+					Vector2[] fpts = new Vector2[ForkSegments + 1];
+					for (int i = 0; i <= ForkSegments; i++)
 					{
-						glow.isVisible = false;
-						core.isVisible = false;
-						continue;
+						float t = i / (float)ForkSegments;
+						Vector2 straight = forkRoot + (forkDir * (forkLen * t));
+						fpts[i] = straight + (perp * forkOffsets[i]);
 					}
 
-					glow.isVisible = true;
-					core.isVisible = true;
-
-					float angle = Custom.VecToDeg(seg / segLen) - 90f;
-
-					// 光晕（宽、半透明、加色）
-					glow.x = a.x - camPos.x;
-					glow.y = a.y - camPos.y;
-					glow.scaleX = segLen / 16f;
-					glow.scaleY = GlowThickness / 16f;
-					glow.rotation = angle;
-					glow.alpha = alpha * 0.55f;
-
-					// 核心（细、亮）
-					core.x = a.x - camPos.x;
-					core.y = a.y - camPos.y;
-					core.scaleX = segLen / 16f;
-					core.scaleY = BaseThickness / 16f;
-					core.rotation = angle;
-					core.alpha = alpha;
-					core.color = coreColor;
+					for (int i = 0; i < ForkSegments; i++)
+					{
+						float tt = i / (float)(ForkSegments - 1);
+						float taper = Mathf.Lerp(0.85f, 0.15f, tt);
+						DrawSegment(forkGlowSprites[i], forkCoreSprites[i], fpts[i], fpts[i + 1],
+							BaseThickness * taper, GlowThickness * taper,
+							alpha * 0.85f, coreColor, camPos);
+					}
 				}
+				else
+				{
+					for (int i = 0; i < ForkSegments; i++)
+					{
+						forkGlowSprites[i].isVisible = false;
+						forkCoreSprites[i].isVisible = false;
+					}
+				}
+			}
+
+			private static void HideAll(RoomCamera.SpriteLeaser sLeaser)
+			{
+				for (int i = 0; i < sLeaser.sprites.Length; i++)
+					sLeaser.sprites[i].isVisible = false;
+			}
+
+			private static void DrawSegment(
+				FSprite glow, FSprite core,
+				Vector2 a, Vector2 b,
+				float coreWidth, float glowWidth,
+				float alpha, Color coreColor,
+				Vector2 camPos)
+			{
+				Vector2 seg = b - a;
+				float segLen = seg.magnitude;
+				if (segLen < 0.01f)
+				{
+					glow.isVisible = false;
+					core.isVisible = false;
+					return;
+				}
+
+				glow.isVisible = true;
+				core.isVisible = true;
+
+				float angle = Custom.VecToDeg(seg / segLen) - 90f;
+
+				// 光晕：宽、半透明
+				glow.x = a.x - camPos.x;
+				glow.y = a.y - camPos.y;
+				glow.scaleX = segLen / 16f;
+				glow.scaleY = glowWidth / 16f;
+				glow.rotation = angle;
+				glow.alpha = alpha * 0.55f;
+
+				// 核心：细、亮
+				core.x = a.x - camPos.x;
+				core.y = a.y - camPos.y;
+				core.scaleX = segLen / 16f;
+				core.scaleY = coreWidth / 16f;
+				core.rotation = angle;
+				core.alpha = alpha;
+				core.color = coreColor;
 			}
 
 			public override void AddToContainer(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, FContainer? newContatiner)
 			{
 				if (newContatiner == null)
-				{
-					newContatiner = rCam.ReturnFContainer("HUD");
-				}
+					newContatiner = rCam.ReturnFContainer("Foreground");
 
 				foreach (FSprite fsprite in sLeaser.sprites)
 				{
 					fsprite.RemoveFromContainer();
 					newContatiner.AddChild(fsprite);
 				}
+			}
+		}
+
+		public class ElectricArcCosmetic : CosmeticSprite
+		{
+			private readonly int segments;          // 闪电折线段数
+			private readonly Vector2[] offsets;     // 每段相对起点的偏移
+			private readonly Player owner;          // 附着的玩家
+			private float alpha;
+			private float life;                     // 单次电弧寿命
+			private float maxLife;
+			private readonly float maxRadius;       // 电弧最大半径
+			private readonly float width;           // 弧粗细
+
+			public ElectricArcCosmetic(Player player, float radius = 30f, float life = 0.15f, float width = 2f)
+			{
+				this.owner = player;
+				this.maxRadius = radius;
+				this.width = width;
+				this.maxLife = life;
+				this.life = life;
+				this.alpha = 0f;
+
+				this.segments = 6;
+				this.offsets = new Vector2[segments + 1];
+				this.pos = player.bodyChunks[0].pos;
+				this.lastPos = this.pos;
+				this.RegeneratePath();
+			}
+
+			public override void Update(bool eu)
+			{
+				// 电弧自身不位移，跟随玩家中心
+				this.lastPos = this.pos;
+				if (owner != null && !owner.slatedForDeletetion)
+				{
+					this.pos = owner.bodyChunks[0].pos;
+				}
+
+				this.life -= 1f / 40f;
+				// 前后 25% 淡入淡出
+				float t = this.life / maxLife;
+				this.alpha = Mathf.InverseLerp(0f, 0.25f, t) * Mathf.InverseLerp(1f, 0.75f, t);
+
+				// 每帧抖动一次路径，产生"滋滋"的颤动感
+				this.JitterPath();
+
+				base.Update(eu);
+				if (this.life <= 0f)
+				{
+					this.Destroy();
+				}
+			}
+
+			private void RegeneratePath()
+			{
+				// 随机起点和终点在玩家周围
+				Vector2 start = Custom.RNV() * maxRadius * Random.Range(0.5f, 1f);
+				Vector2 end = Custom.RNV() * maxRadius * Random.Range(0.5f, 1f);
+				for (int i = 0; i <= segments; i++)
+				{
+					float f = i / (float)segments;
+					// 直线插值 + 垂直于直线方向的随机偏移，形成闪电折线
+					Vector2 p = Vector2.Lerp(start, end, f);
+					if (i > 0 && i < segments)
+					{
+						Vector2 perp = Custom.PerpendicularVector((end - start).normalized);
+						p += perp * Random.Range(-maxRadius * 0.4f, maxRadius * 0.4f);
+					}
+					this.offsets[i] = p;
+				}
+			}
+
+			private void JitterPath()
+			{
+				for (int i = 1; i < segments; i++)
+				{
+					this.offsets[i] += Custom.RNV() * maxRadius * 0.1f;
+				}
+			}
+
+			public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+			{
+				// 每段用两个三角形画一条细长四边形
+				int triCount = segments * 2;
+				sLeaser.sprites = new FSprite[1];
+
+				TriangleMesh.Triangle[] tris = new TriangleMesh.Triangle[triCount];
+				for (int i = 0; i < triCount; i += 2)
+				{
+					int v = i * 2; // 第 i 段对应顶点 4i..4i+3
+					tris[i] = new TriangleMesh.Triangle(v, v + 1, v + 2);
+					tris[i + 1] = new TriangleMesh.Triangle(v + 1, v + 3, v + 2);
+				}
+				TriangleMesh mesh = new TriangleMesh("Futile_White", tris, false)
+				{
+					//shader = rCam.room.game.rainWorld.Shaders["FlatLight"] // 发光效果
+				};
+				sLeaser.sprites[0] = mesh;
+
+				base.InitiateSprites(sLeaser, rCam);
+				this.AddToContainer(sLeaser, rCam, null);
+			}
+
+			public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+			{
+				base.DrawSprites(sLeaser, rCam, timeStacker, camPos);
+				Vector2 center = Vector2.Lerp(this.lastPos, this.pos, timeStacker);
+
+				TriangleMesh mesh = (TriangleMesh)sLeaser.sprites[0];
+				for (int i = 0; i < segments; i++)
+				{
+					Vector2 a = center + offsets[i];
+					Vector2 b = center + offsets[i + 1];
+					Vector2 dir = (b - a).normalized;
+					Vector2 perp = Custom.PerpendicularVector(dir) * width * 0.5f * this.alpha;
+
+					// 每段 4 个顶点：a上、a下、b上、b下
+					mesh.MoveVertice(i * 4, a + perp - camPos);
+					mesh.MoveVertice((i * 4) + 1, a - perp - camPos);
+					mesh.MoveVertice((i * 4) + 2, b + perp - camPos);
+					mesh.MoveVertice((i * 4) + 3, b - perp - camPos);
+				}
+				mesh.alpha = this.alpha;
+				// 电弧颜色：青白色
+				mesh.color = Color.Lerp(new Color(0.5f, 0.8f, 1f), Color.white, this.alpha);
+			}
+
+			public override void AddToContainer(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, FContainer? newContatiner)
+			{
+				if (newContatiner == null)
+				{
+					newContatiner = rCam.ReturnFContainer("Midground");
+				}
+				base.AddToContainer(sLeaser, rCam, newContatiner);
 			}
 		}
 

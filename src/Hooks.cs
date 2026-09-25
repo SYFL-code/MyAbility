@@ -147,15 +147,15 @@ public static class Hooks
 		}
 		#endregion
 
-		#region Hardening
+		#region StalwartShell
 		{
 			HookManager.Register(
-				Hook: () => On.Player.Update += Hardening.Player_Update,
-				UnHook: () => On.Player.Update -= Hardening.Player_Update
+				Hook: () => On.Creature.Update += StalwartShell.Creature_Update,
+				UnHook: () => On.Creature.Update -= StalwartShell.Creature_Update
 			);
 			HookManager.Register(
-				Hook: () => HitSomething += Hardening.Hardening_HitSomething,
-				UnHook: () => HitSomething -= Hardening.Hardening_HitSomething
+				Hook: () => HitSomething += StalwartShell.StalwartShell_HitSomething,
+				UnHook: () => HitSomething -= StalwartShell.StalwartShell_HitSomething
 			);
 		}
 		#endregion

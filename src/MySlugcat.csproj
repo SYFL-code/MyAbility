@@ -172,9 +172,9 @@
 		<Delete Files="@(RemovePlugins)" />
 		
 		<!-- 复制到 newest -->
-		<Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/newest/plugins/" />
+		<!-- <Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/newest/plugins/" /> -->
 		<!-- Release 时额外清理 PDB -->
-		<Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/newest/plugins/*.pdb" />
+		<!-- <Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/newest/plugins/*.pdb" /> -->
 
 		<!-- 复制到 plugins -->
 		<Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/plugins/" />
