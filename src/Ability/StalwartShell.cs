@@ -96,7 +96,7 @@ namespace MySlugcat.Ability
 					HitAnotherPhysicalObject(creature, weapon, false);
 
 					creature.Shell.lastHitOffset = weapon.firstChunk.pos - creature.mainBodyChunk.pos;
-					HitEffect(creature, weapon.firstChunk.pos + weapon.firstChunk.vel, weapon.firstChunk.vel);
+					HitEffect(creature, weapon.firstChunk.pos + (weapon.firstChunk.vel * 2f), weapon.firstChunk.vel);
 					AddDamage(creature, weapon.HeavyWeapon ? 0.5f : 0.2f);
 
 					return false;
@@ -236,28 +236,44 @@ namespace MySlugcat.Ability
 				{
 					Shell Shell = creature.Shell;
 
-
-					Shell.sprites = new FSprite?[sLeaser.sprites.Length];
-					for (int i = 0; i < Shell.sprites.Length; i++)
+					foreach (var sprite in Shell.sprites)
 					{
-						//if (!sLeaser.sprites[i].element.name.StartsWith("Leg"))
-						//{
-						//	//FSprite copy = CloneFSprite(sLeaser.sprites[i]);
-						//	FSprite copy = new FSprite("Circle20");
+						if (sprite != null)
+						{
+							sprite.RemoveFromContainer();
+						}
+					}
+					Shell.sprites = new FSprite?[2, sLeaser.sprites.Length];
+					for (int j = 0; j < Shell.sprites.GetLength(0); j++)
+					{
+						for (int i = 0; i < Shell.sprites.GetLength(1); i++)
+						{
+							if (creature is not Player || !sLeaser.sprites[i].element.name.StartsWith("Leg"))
+							{
+								FSprite copy = CloneFSprite(sLeaser.sprites[i]);
+								//FSprite copy = new FSprite("Circle20");
 
-						//	Shell.sprites[i] = copy;
-						//	//Shell.sprites[i]!.scaleX = graphicsModule.owner.bodyChunks[i].rad / 16f;
-						//	//Shell.sprites[i]!.scaleY = graphicsModule.owner.bodyChunks[i].rad / 16f;
-						//	//Shell.sprites[i]!.scaleX = sLeaser.sprites[i].scaleX * 1.5f;
-						//	//Shell.sprites[i]!.scaleY = sLeaser.sprites[i].scaleY * 1.5f;
-						//	//Shell.sprites[i]!.color = new Color(220f / 256f, 220 / 256f, 170 / 256f);
+								Shell.sprites[j, i] = copy;
+								//Shell.sprites[i]!.scaleX = graphicsModule.owner.bodyChunks[i].rad / 16f;
+								//Shell.sprites[i]!.scaleY = graphicsModule.owner.bodyChunks[i].rad / 16f;
 
-						//	rCam.ReturnFContainer("Background").AddChild(Shell.sprites[i]);
-						//}
-						//else
-						//{
-						//	Shell.sprites[i] = null;
-						//}
+								//Shell.sprites[i]!.color = new Color(220f / 256f, 220 / 256f, 170 / 256f);
+								if (j == 0)
+								{
+									Shell.sprites[j, i]!.color = new Color(0.01f, 0f, 0f);
+								}
+								if (j == 1)
+								{
+									Shell.sprites[j, i]!.color = creature.ShortCutColor().HSV(1f, 1.5f, 0.5f);
+								}
+
+								rCam.ReturnFContainer("Background").AddChild(Shell.sprites[j, i]);
+							}
+							else
+							{
+								Shell.sprites[j, i] = null;
+							}
+						}
 					}
 				}
 			}
@@ -275,23 +291,50 @@ namespace MySlugcat.Ability
 					Shell Shell = creature.Shell;
 
 
-					//for (int i = 0; i < Shell.sprites.Length; i++)
-					//{
-					//	if (Shell.sprites[i] != null)
-					//	{
-					//		//Shell.sprites[i]?.x = graphicsModule.owner.bodyChunks[i].pos.x - camPos.x;
-					//		//Shell.sprites[i]?.y = graphicsModule.owner.bodyChunks[i].pos.y - camPos.y;
+					if (!Shell.validity)
+					{
+						foreach (var sprite in Shell.sprites)
+						{
+							if (sprite != null)
+							{
+								sprite.RemoveFromContainer();
+							}
+						}
+					}
+					for (int j = 0; j < Shell.sprites.GetLength(0); j++)
+					{
+						for (int i = 0; i < Shell.sprites.GetLength(1); i++)
+						{
+							if (Shell.sprites[j, i] != null)
+							{
+								//Shell.sprites[i]?.x = graphicsModule.owner.bodyChunks[i].pos.x - camPos.x;
+								//Shell.sprites[i]?.y = graphicsModule.owner.bodyChunks[i].pos.y - camPos.y;
 
 
-					//		Shell.sprites[i]!.x = sLeaser.sprites[i].x;
-					//		Shell.sprites[i]!.y = sLeaser.sprites[i].y;
+								Shell.sprites[j, i]!.x = sLeaser.sprites[i].x;
+								Shell.sprites[j, i]!.y = sLeaser.sprites[i].y;
 
-					//		Shell.sprites[i]!.rotation = sLeaser.sprites[i].rotation;
+								Shell.sprites[j, i]!.rotation = sLeaser.sprites[i].rotation;
 
-					//		Shell.sprites[i]!.isVisible = sLeaser.sprites[i].isVisible;
-					//		Shell.sprites[i]!.alpha = sLeaser.sprites[i].alpha;
-					//	}
-					//}
+								Shell.sprites[j, i]!.isVisible = sLeaser.sprites[i].isVisible;
+								Shell.sprites[j, i]!.alpha = sLeaser.sprites[i].alpha;
+
+
+								Shell.sprites[j, i]!.scaleX = (sLeaser.sprites[i].scaleX * 1.4f) - (Shell.damage * 0.425f);
+								Shell.sprites[j, i]!.scaleY = (sLeaser.sprites[i].scaleY * 1.4f) - (Shell.damage * 0.425f);
+								if (j == 0)
+								{
+									Shell.sprites[j, i]!.scaleX *= 1.175f - (Shell.damage * 0.2f);
+									Shell.sprites[j, i]!.scaleY *= 1.175f - (Shell.damage * 0.2f);
+									if (creature is Scavenger)
+									{
+										Shell.sprites[j, i]!.scaleX *= 1.475f - (Shell.damage * 0.5f);
+										Shell.sprites[j, i]!.scaleY *= 1.475f - (Shell.damage * 0.5f);
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -394,7 +437,7 @@ namespace MySlugcat.Ability
 			public float damage;
 			public Vector2 lastHitOffset;
 
-			public FSprite?[] sprites = [];
+			public FSprite?[,] sprites = new FSprite?[2,0];
 
 			public Shell(Creature creature)
 			{
@@ -405,6 +448,17 @@ namespace MySlugcat.Ability
 					//{
 					//	damage = -99999;
 					//}
+				}
+			}
+
+			~Shell()
+			{
+				foreach (var sprite in sprites)
+				{
+					if (sprite != null)
+					{
+						sprite.RemoveFromContainer();
+					}
 				}
 			}
 		}
