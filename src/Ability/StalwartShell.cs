@@ -16,12 +16,15 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Security.Policy;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using UnityEngine;
 using Watcher;
 using static MySlugcat.Ability.Camouflage;
 using static PhysicalObject;
+using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
+using static UnityEngine.UI.Image;
 
 namespace MySlugcat.Ability
 {
@@ -43,56 +46,61 @@ namespace MySlugcat.Ability
 			}
 
 
-			if (result.obj is Creature self)
+
+			if (result.obj is Creature creature)
 			{
-				if (self.GetModule().StalwartShellAbility && self.GetStalwartShellModule(out var module).validity)
+				if (creature.Module.StalwartShellAbility && creature.Shell.validity)
 				{
-					weapon.GetModule(out var weaponModule);
-					if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy &&
-						!thrownBy.GetModule().PenetrationAbility)
+					if (weapon.Module.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy &&
+						thrownBy.Module.PenetrationAbility)
 					{
-						Player? player = self as Player;
-
-						//float weaponSpeed = weapon.firstChunk.vel.magnitude;// 一般为40f
-
-						//float chance = 0.01f;
-						//chance += weaponSpeed > 40f ? weaponSpeed  /1000f * 2 : 0f;
-						//chance += player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam ? 0.02f : 0f;
-
-						//chance = Mathf.Clamp01(chance);
-						//if (UnityEngine.Random.value < chance)
-						//{
-						//	self.Stun(40);
-						//}
-						//if (player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam && UnityEngine.Random.value < 0.03f)
-						//{
-						//	self.Stun(1);
-						//}
-
-						//if (weaponSpeed < 60f || UnityEngine.Random.value < 0.10f)
-						//{
-						//	result.obj = null;
-						//	result.chunk = null;
-						//	result.onAppendagePos = null;
-
-						//	HitAnotherPhysicalObject(player, weapon, false);
-
-						//}
-
-						self.Violence(weapon.firstChunk, weapon.firstChunk.vel * weapon.firstChunk.mass * 2f,
-							result.chunk, result.onAppendagePos,
-							Creature.DamageType.None, 0f, 0f);
-
-						result.obj = null;
-						result.chunk = null;
-						result.onAppendagePos = null;
-
-						HitAnotherPhysicalObject(self, weapon, false);
-
-						module.lastHitOffset = weapon.firstChunk.pos - self.mainBodyChunk.pos;
-						HitEffect(self, weapon.firstChunk.pos + weapon.firstChunk.vel, weapon.firstChunk.vel);
-						AddDamage(self, weapon.HeavyWeapon ? 0.5f : 0.2f);
+						return orig_HitSomething(orig_, weapon, result, eu);
 					}
+
+					Player? player = creature as Player;
+
+					//float weaponSpeed = weapon.firstChunk.vel.magnitude;// 一般为40f
+
+					//float chance = 0.01f;
+					//chance += weaponSpeed > 40f ? weaponSpeed  /1000f * 2 : 0f;
+					//chance += player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam ? 0.02f : 0f;
+
+					//chance = Mathf.Clamp01(chance);
+					//if (UnityEngine.Random.value < chance)
+					//{
+					//	self.Stun(40);
+					//}
+					//if (player?.bodyMode == Player.BodyModeIndex.ClimbingOnBeam && UnityEngine.Random.value < 0.03f)
+					//{
+					//	self.Stun(1);
+					//}
+
+					//if (weaponSpeed < 60f || UnityEngine.Random.value < 0.10f)
+					//{
+					//	result.obj = null;
+					//	result.chunk = null;
+					//	result.onAppendagePos = null;
+
+					//	HitAnotherPhysicalObject(player, weapon, false);
+
+					//}
+
+					creature.Violence(weapon.firstChunk, weapon.firstChunk.vel * weapon.firstChunk.mass * 2f,
+						result.chunk, result.onAppendagePos,
+						Creature.DamageType.None, 0f, 0f);
+
+					//result.obj = null;
+					//result.chunk = null;
+					//result.onAppendagePos = null;
+
+					HitAnotherPhysicalObject(creature, weapon, false);
+
+					creature.Shell.lastHitOffset = weapon.firstChunk.pos - creature.mainBodyChunk.pos;
+					HitEffect(creature, weapon.firstChunk.pos + weapon.firstChunk.vel, weapon.firstChunk.vel);
+					AddDamage(creature, weapon.HeavyWeapon ? 0.5f : 0.2f);
+
+					return false;
+					//return orig_HitSomething(orig_, weapon, result, eu);
 				}
 			}
 			return orig_HitSomething(orig_, weapon, result, eu);
@@ -104,80 +112,61 @@ namespace MySlugcat.Ability
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
 
-		public static void Creature_Update(On.Creature.orig_Update orig, Creature self, bool eu)
+		public static void Creature_Update(On.Creature.orig_Update orig, Creature creature, bool eu)
 		{
-			if (self.GetModule().StalwartShellAbility)
+			if (creature.Module.StalwartShellAbility)
 			{
-				self.GetStalwartShellModule(out var module);
-
-				bool lastValidity = module.validity;
-				if (module.validity)
+				var Shell = creature.Shell;
+				
+				bool lastValidity = Shell.validity;
+				if (Shell.validity)
 				{
-					if (!module.initRestistances)
-					{
-						module.initRestistances = true;
+					//if (!Shell.initRestistances)
+					//{
+					//	Shell.initRestistances = true;
 
-						// 复制一份个体专用模板
-						var newTemplate = new CreatureTemplate(self.Template);
+					//	// 复制一份个体专用模板
+					//	var newTemplate = new CreatureTemplate(self.Template);
 
-						// 修改副本的抗性
-						SetResistance(newTemplate, Creature.DamageType.Blunt, 0.85f, 0.85f);
-						SetResistance(newTemplate, Creature.DamageType.Stab, 0.55f, 0.55f);
-						SetResistance(newTemplate, Creature.DamageType.Bite, 0.5f, 0.5f);
-						SetResistance(newTemplate, Creature.DamageType.Explosion, 0.7f, 0.7f);
+					//	// 修改副本的抗性
+					//	SetResistance(newTemplate, Creature.DamageType.Blunt, 0.85f, 0.85f);
+					//	SetResistance(newTemplate, Creature.DamageType.Stab, 0.55f, 0.55f);
+					//	SetResistance(newTemplate, Creature.DamageType.Bite, 0.5f, 0.5f);
+					//	SetResistance(newTemplate, Creature.DamageType.Explosion, 0.7f, 0.7f);
 
-						// 替换个体模板
-						module.origTemplate = self.abstractCreature.creatureTemplate;
-						self.abstractCreature.creatureTemplate = newTemplate;
-					}
+					//	// 替换个体模板
+					//	module.origTemplate = self.abstractCreature.creatureTemplate;
+					//	self.abstractCreature.creatureTemplate = newTemplate;
+					//}
 				}
 
-				if (module.damage >= 1 && module.validity && UnityEngine.Random.value < 0.015f)
+				if (Shell.damage >= 1 && Shell.validity && UnityEngine.Random.value < 0.015f)
 				{
-					Shatter(self, module.lastHitOffset + self.mainBodyChunk.pos);
+					Shatter(creature, Shell.lastHitOffset + creature.mainBodyChunk.pos);
 				}
 
-				if (lastValidity && !module.validity)
+				//if (lastValidity && !Shell.validity)
+				//{
+				//	if (Shell.origTemplate != null)
+				//	{
+				//		creature.abstractCreature.creatureTemplate = Shell.origTemplate;
+				//	}
+				//}
+
+				if (Plugin.DebugMode)
 				{
-					if (module.origTemplate != null)
+					if (creature is Player)
 					{
-						self.abstractCreature.creatureTemplate = module.origTemplate;
+						if (Input.GetKey("x"))
+						{
+							Shell.damage = 0;
+							Shell.validity = true;
+						}
 					}
 				}
 			}
 
-			//player.GetModule(out var playerModule);
-			//if (playerModule.HardeningAbility)
-			//{
-			//	player.GetHardeningModule(out var module);
-
-			//	if (module.HardeningCounter > 0)
-			//	{
-			//		module.HardeningCounter--;
-			//	}
-			//	if (module.HardeningCdCounter > 0)
-			//	{
-			//		module.HardeningCdCounter--;
-			//	}
-			//	if (module.HardeningCounter <= 0)
-			//	{
-			//		module.EnableHardening = false;
-			//	}
-
-			//	if (Input.GetKey("x"))
-			//	{
-			//		if (module.HardeningCdCounter <= 0)
-			//		{
-			//			module.HardeningCounter = 10 * 40;
-			//			module.HardeningCdCounter = 30 * 40;
-			//			module.EnableHardening = true;
-
-			//			//player.room.AddObject(new CommonUtils.Core.DebugSprite(player, 10 * 40));
-			//		}
-			//	}
-			//}
-
-			orig(self, eu);
+			orig(creature, eu);
 		}
 		private static void SetResistance(CreatureTemplate template, Creature.DamageType type, float dmgScale, float stunScale)
 		{
@@ -201,12 +190,11 @@ namespace MySlugcat.Ability
 		}
 		public static void AddDamage(Creature creature, float damage)
 		{
-			creature.GetStalwartShellModule(out var module);
+			var Shell = creature.Shell;
 
-			module.damage += damage * 0.2f;
-
-			if (module.damage > 1)
-				module.damage = 1;
+			Shell.damage += damage * 0.2f;
+			if (Shell.damage > 1)
+				Shell.damage = 1;
 		}
 		public static void Shatter(Creature creature, Vector2 impactPos)
 		{
@@ -229,11 +217,122 @@ namespace MySlugcat.Ability
 
 			creature.room.PlaySound(SoundID.Weapon_Skid, impactPos, 0.75f, 1.25f);
 
-			creature.GetStalwartShellModule(out var module);
-			module.validity = false;
+			creature.Shell.validity = false;
 			//AllGraspsLetGoOfThisObject(true);
 			//abstractPhysicalObject.LoseAllStuckObjects();
 			//Destroy();
+		}
+
+
+		public static void InitiateSprites(On.GraphicsModule.orig_InitiateSprites orig, GraphicsModule graphicsModule,
+			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+		{
+			orig(graphicsModule, sLeaser, rCam);
+
+
+			if (graphicsModule.owner is Creature creature)
+			{
+				if (creature.Module.StalwartShellAbility)
+				{
+					Shell Shell = creature.Shell;
+
+
+					Shell.sprites = new FSprite?[sLeaser.sprites.Length];
+					for (int i = 0; i < Shell.sprites.Length; i++)
+					{
+						//if (!sLeaser.sprites[i].element.name.StartsWith("Leg"))
+						//{
+						//	//FSprite copy = CloneFSprite(sLeaser.sprites[i]);
+						//	FSprite copy = new FSprite("Circle20");
+
+						//	Shell.sprites[i] = copy;
+						//	//Shell.sprites[i]!.scaleX = graphicsModule.owner.bodyChunks[i].rad / 16f;
+						//	//Shell.sprites[i]!.scaleY = graphicsModule.owner.bodyChunks[i].rad / 16f;
+						//	//Shell.sprites[i]!.scaleX = sLeaser.sprites[i].scaleX * 1.5f;
+						//	//Shell.sprites[i]!.scaleY = sLeaser.sprites[i].scaleY * 1.5f;
+						//	//Shell.sprites[i]!.color = new Color(220f / 256f, 220 / 256f, 170 / 256f);
+
+						//	rCam.ReturnFContainer("Background").AddChild(Shell.sprites[i]);
+						//}
+						//else
+						//{
+						//	Shell.sprites[i] = null;
+						//}
+					}
+				}
+			}
+		}
+		public static void DrawSprites(On.GraphicsModule.orig_DrawSprites orig, GraphicsModule graphicsModule,
+			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+		{
+			orig(graphicsModule, sLeaser, rCam, timeStacker, camPos);
+
+
+			if (graphicsModule.owner is Creature creature)
+			{
+				if (creature.Module.StalwartShellAbility)
+				{
+					Shell Shell = creature.Shell;
+
+
+					//for (int i = 0; i < Shell.sprites.Length; i++)
+					//{
+					//	if (Shell.sprites[i] != null)
+					//	{
+					//		//Shell.sprites[i]?.x = graphicsModule.owner.bodyChunks[i].pos.x - camPos.x;
+					//		//Shell.sprites[i]?.y = graphicsModule.owner.bodyChunks[i].pos.y - camPos.y;
+
+
+					//		Shell.sprites[i]!.x = sLeaser.sprites[i].x;
+					//		Shell.sprites[i]!.y = sLeaser.sprites[i].y;
+
+					//		Shell.sprites[i]!.rotation = sLeaser.sprites[i].rotation;
+
+					//		Shell.sprites[i]!.isVisible = sLeaser.sprites[i].isVisible;
+					//		Shell.sprites[i]!.alpha = sLeaser.sprites[i].alpha;
+					//	}
+					//}
+				}
+			}
+		}
+
+		public static FSprite CloneFSprite(FSprite src)
+		{
+			// 用同一个图集元素和 facet 类型创建新 sprite
+			var copy = new FSprite(src._element, src._facetTypeQuad)
+			{
+				// 复制位置、缩放、旋转、锚点
+				_x = src._x,
+				_y = src._y,
+				_scaleX = src._scaleX,
+				_scaleY = src._scaleY,
+				_rotation = src._rotation,
+				_anchorX = src._anchorX,
+				_anchorY = src._anchorY,
+
+				// 复制颜色和透明度
+				_color = src._color,
+				_alpha = src._alpha,
+
+				// 复制可见性
+				_isVisible = src._isVisible,
+				_visibleScale = src._visibleScale,
+
+				// 可选：复制 meshZ / sortZ
+				_meshZ = src._meshZ,
+				_sortZ = src._sortZ,
+
+				// 可选：复制自定义数据
+				// copy.data = src.data;
+
+				// 标记为脏，让下一帧重新计算顶点、矩阵和颜色
+				_isMatrixDirty = true,
+				_isAlphaDirty = true,
+				_areLocalVerticesDirty = true,
+				_isMeshDirty = true
+			};
+
+			return copy;
 		}
 
 		public static void HitAnotherPhysicalObject(PhysicalObject physicalObject, PhysicalObject obj, bool validity)
@@ -287,41 +386,31 @@ namespace MySlugcat.Ability
 			physicalObject.room.PlaySound(SoundID.Spear_Bounce_Off_Creauture_Shell, inbetweenPos, physicalObject.abstractPhysicalObject);
 		}
 
-		public class StalwartShellModule
+
+
+		public class Shell
 		{
 			public bool validity = true;
 			public float damage;
 			public Vector2 lastHitOffset;
 
-			public bool initRestistances;
-			public CreatureTemplate? origTemplate;
-			//public float?[,] damageRestistances;
+			public FSprite?[] sprites = [];
 
-			//public bool EnableHardening = false;
-			//public int HardeningCounter;
-			//public int HardeningCdCounter;
-
-			public StalwartShellModule(Creature self)
+			public Shell(Creature creature)
 			{
-				//damageRestistances = new float?[ExtEnum<Creature.DamageType>.values.Count, 2];
 
 				if (Plugin.DebugMode)
 				{
-					if (self is Player)
-					{
-						damage = -9999;
-					}
+					//if (creature is Player)
+					//{
+					//	damage = -99999;
+					//}
 				}
 			}
 		}
-		public static StalwartShellModule GetStalwartShellModule(this Creature self, out StalwartShellModule module)
+		extension(Creature creature)
 		{
-			module = GetStalwartShellModule(self);
-			return module;
-		}
-		public static StalwartShellModule GetStalwartShellModule(this Creature self)
-		{
-			return ModuleManager.Get(self, s => new StalwartShellModule(s));
+			public Shell Shell => ModuleManager.Get(creature, c => new Shell(c));
 		}
 
 	}

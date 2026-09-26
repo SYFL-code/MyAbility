@@ -26,52 +26,86 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Watcher;
 using static CommonUtils.Core.HookManager;
+using static Menu.Remix.InternalOI;
 using static PhysicalObject;
 
 namespace MySlugcat
 {
 	public static class ModuleExtensions
 	{
-		public static PlayerModule GetModule(this Player player)
-		{
-			return ModuleManager.Get<Player, PlayerModule>(player, p => new PlayerModule(p));
-		}
+		#region Player
 		public static PlayerModule GetModule(this Player player, out PlayerModule module)
 		{
-			module = GetModule(player);
+			module = player.Module;
 			return module;
 		}
+		extension(Player player)
+		{
+			public PlayerModule Module => (PlayerModule)((PhysicalObject)player).GetModule();
+		}
+		#endregion
 
+		#region Creature
 		public static CreatureModule GetModule(this Creature creature)
 		{
-			return ModuleManager.Get<Creature, CreatureModule>(creature, c => new CreatureModule(c));
+			return creature.Module;
 		}
 		public static CreatureModule GetModule(this Creature creature, out CreatureModule module)
 		{
-			module = GetModule(creature);
+			module = creature.Module;
 			return module;
 		}
 		extension(Creature creature)
 		{
-			public CreatureModule Module => creature.GetModule();
+			public CreatureModule Module => (CreatureModule)((PhysicalObject)creature).GetModule();
 		}
+		#endregion
 
-		public static WeaponModule GetModule(this Weapon weapon)
+		#region PhysicalObject
+		public static PhysicalObjectModule GetModule(this PhysicalObject physicalObject)
 		{
-			return ModuleManager.Get(weapon, w => new WeaponModule(w));
+			return ModuleManager.Get<PhysicalObject, PhysicalObjectModule>(physicalObject, obj =>
+			{
+				if (obj is Player p)
+					return new PlayerModule(p);
+
+				else if(obj is Creature c)
+					return new CreatureModule(c);
+
+				else if (obj is Weapon w)
+					return new WeaponModule(w);
+
+				else
+					return new PhysicalObjectModule(obj);
+			});
+
+			//return ModuleManager.Get(physicalObject, p => new PhysicalObjectModule(p));
 		}
+		public static PhysicalObjectModule GetModule(this PhysicalObject physicalObject, out PhysicalObjectModule module)
+		{
+			module = physicalObject.Module;
+			return module;
+		}
+		extension(PhysicalObject physicalObject)
+		{
+			public PhysicalObjectModule Module => physicalObject.GetModule();
+		}
+		#endregion
+
+		#region Weapon
 		public static WeaponModule GetModule(this Weapon weapon, out WeaponModule module)
 		{
-			module = GetModule(weapon);
+			module = weapon.Module;
 			return module;
 		}
 		extension(Weapon weapon)
 		{
-			public WeaponModule Module => weapon.GetModule();
+			public WeaponModule Module => (WeaponModule)((PhysicalObject)weapon).GetModule();
 		}
+		#endregion
 	}
 
-	public class PlayerModule
+	public class PlayerModule : CreatureModule
 	{
 		private WeakReference<Player> _playerRef;
 
@@ -83,7 +117,8 @@ namespace MySlugcat
 		//public bool TrackingThrowAbility = false;
 		public bool ExtraGraspAbility = false;
 
-		public PlayerModule(Player player)
+		public PlayerModule(Player player):
+			base(player)
 		{
 			_playerRef = new WeakReference<Player>(player);
 
@@ -103,7 +138,7 @@ namespace MySlugcat
 		}
 	}
 
-	public class CreatureModule
+	public class CreatureModule : PhysicalObjectModule
 	{
 		private WeakReference<Creature> _creatureRef;
 
@@ -114,7 +149,8 @@ namespace MySlugcat
 		public bool StalwartShellAbility = false;
 		public bool TrackingThrowAbility = false;
 
-		public CreatureModule(Creature creature)
+		public CreatureModule(Creature creature) :
+			base(creature)
 		{
 			_creatureRef = new WeakReference<Creature>(creature);
 
@@ -124,7 +160,7 @@ namespace MySlugcat
 				{
 					if (player.slugcatStats.name == SlugcatStats.Name.White)
 					{
-						PenetrationAbility = true;
+						//PenetrationAbility = true;
 						FrameAbility = true;
 						//ArcLightningAbility = true;
 						DeflagrationAbility = true;
@@ -133,13 +169,21 @@ namespace MySlugcat
 				}
 				else
 				{
-					StalwartShellAbility = true;
 				}
+				StalwartShellAbility = true;
 			}
 		}
 	}
 
-	public class WeaponModule
+	public class PhysicalObjectModule
+	{
+		public PhysicalObjectModule(PhysicalObject physicalObject)
+		{
+
+		}
+	}
+
+	public class WeaponModule : PhysicalObjectModule
 	{
 		public WeakReference<PhysicalObject?> Owner = new(null);
 
@@ -150,7 +194,8 @@ namespace MySlugcat
 		// 武器穿透次数
 		public int penetrateCount = 0;
 
-		public WeaponModule(Weapon weapon)
+		public WeaponModule(Weapon weapon) :
+			base(weapon)
 		{
 
 		}

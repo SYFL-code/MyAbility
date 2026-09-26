@@ -219,6 +219,14 @@ public static class Hooks
 				Hook: () => HitSomething += StalwartShell.StalwartShell_HitSomething,
 				UnHook: () => HitSomething -= StalwartShell.StalwartShell_HitSomething
 			);
+			HookManager.Register(
+				Hook: () => On.GraphicsModule.InitiateSprites += StalwartShell.InitiateSprites,
+				UnHook: () => On.GraphicsModule.InitiateSprites -= StalwartShell.InitiateSprites
+			);
+			HookManager.Register(
+				Hook: () => On.GraphicsModule.DrawSprites += StalwartShell.DrawSprites,
+				UnHook: () => On.GraphicsModule.DrawSprites -= StalwartShell.DrawSprites
+			);
 		}
 		#endregion
 

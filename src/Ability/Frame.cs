@@ -48,7 +48,7 @@ namespace MySlugcat.Ability
 
 						if (!Plugin.DebugMode || !Debugger.bools[0, false])
 						{
-							if (player.GetModule().CamouflageAbility)
+							if (player.Module.CamouflageAbility)
 							{
 								player.GetCamouflageModule(out var camouflageModule);
 								camouflageModule.CdTimer = 200;
@@ -196,7 +196,7 @@ namespace MySlugcat.Ability
 				hitCreature.GetModule(out var module);
 				if (module.FrameAbility)
 				{
-					if (!module.StalwartShellAbility || !hitCreature.GetStalwartShellModule().validity)
+					if (!module.StalwartShellAbility || !hitCreature.Shell.validity)
 					{
 						Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
 							[hitCreature], [hitCreature.GetType(), typeof(Fly)]);
