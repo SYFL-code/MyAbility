@@ -196,7 +196,7 @@ namespace MySlugcat.Ability
 				hitCreature.GetModule(out var module);
 				if (module.FrameAbility)
 				{
-					if (!module.StalwartShellAbility || !hitCreature.Shell.validity)
+					if (!module.CrystalShieldAbility || !hitCreature.Shield.validity)
 					{
 						Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
 							[hitCreature], [hitCreature.GetType(), typeof(Fly)]);
