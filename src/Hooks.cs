@@ -228,6 +228,10 @@ public static class Hooks
 				Hook: () => On.Weapon.HitAnotherThrownWeapon += Penetration.Weapon_HitAnotherThrownWeapon,
 				UnHook: () => On.Weapon.HitAnotherThrownWeapon -= Penetration.Weapon_HitAnotherThrownWeapon
 			);
+			HookManager.Register(
+				Hook: () => On.Lizard.HitInMouth += Penetration.HitInMouth,
+				UnHook: () => On.Lizard.HitInMouth -= Penetration.HitInMouth
+			);
 		}
 		{
 			// HitSomething

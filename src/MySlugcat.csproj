@@ -2,7 +2,7 @@
 	
 	<PropertyGroup>
 		<TargetFramework>net48</TargetFramework>
-		<LangVersion>13</LangVersion>
+		<LangVersion>14</LangVersion>
 		<Nullable>enable</Nullable>
 		<Deterministic>true</Deterministic>
 		<DeterministicSourcePaths>false</DeterministicSourcePaths>
@@ -155,7 +155,7 @@
 	</ItemGroup>
 	
 
-	<Target Name="GenerateMod" AfterTargets="PostBuildEvent">
+	<!--<Target Name="GenerateMod" AfterTargets="PostBuildEvent">
 		<ItemGroup>
 			<RemovePlugins Include="../mod/newest/plugins/*.*" />
 			<RemovePlugins Include="../mod/plugins/*.*" />
@@ -163,23 +163,44 @@
 		
 		<ItemGroup>
 			<CopyPlugins Include="$(TargetPath)" />
-			<!-- <CopyPlugins Include="$(TargetDir)MonoWeaver.dll" /> -->
+			--><!-- <CopyPlugins Include="$(TargetDir)MonoWeaver.dll" /> --><!--
 			<CopyPlugins Include="../../CommonUtils/lib/Newtonsoft.Json.dll" />
-			<!-- 只在 Debug 时复制 PDB -->
+			--><!-- 只在 Debug 时复制 PDB --><!--
 			<CopyPlugins Condition="'$(Configuration)' == 'Debug'" Include="$(TargetDir)$(TargetName).pdb" />
 		</ItemGroup>
 		
 		<Delete Files="@(RemovePlugins)" />
 		
-		<!-- 复制到 newest -->
-		<!-- <Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/newest/plugins/" /> -->
-		<!-- Release 时额外清理 PDB -->
-		<!-- <Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/newest/plugins/*.pdb" /> -->
+		--><!-- 复制到 newest --><!--
+		--><!-- <Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/newest/plugins/" /> --><!--
+		--><!-- Release 时额外清理 PDB --><!--
+		--><!-- <Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/newest/plugins/*.pdb" /> --><!--
 
-		<!-- 复制到 plugins -->
+		--><!-- 复制到 plugins --><!--
 		<Copy SourceFiles="@(CopyPlugins)" DestinationFolder="../mod/plugins/" />
-		<!-- Release 时额外清理 PDB -->
+		--><!-- Release 时额外清理 PDB --><!--
 		<Delete Condition="'$(Configuration)' == 'Release'" Files="../mod/plugins/*.pdb" />
+	</Target>-->
+	
+	<Target Name="GenerateMod" AfterTargets="PostBuildEvent">
+		<PropertyGroup>
+			<Plugins>../mod/plugins/</Plugins>
+		</PropertyGroup>
+
+		<!-- 主 DLL：直接覆盖（不先删除） -->
+		<Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Plugins)" />
+
+		<!-- Newtonsoft：内容相同就跳过（不产生文件事件） -->
+		<Copy SourceFiles="../../CommonUtils/lib/Newtonsoft.Json.dll"
+			  DestinationFolder="$(Plugins)"
+			  SkipUnchangedFiles="true" />
+
+		<!-- PDB：只在 Debug 模式复制，Release 模式删除 -->
+		<Copy Condition="'$(Configuration)' == 'Debug'"
+			  SourceFiles="$(TargetDir)$(TargetName).pdb"
+			  DestinationFolder="$(Plugins)" />
+		<Delete Condition="'$(Configuration)' == 'Release'"
+				Files="$(Plugins)$(TargetName).pdb" />
 	</Target>
 	
 </Project>

@@ -51,6 +51,10 @@ namespace MySlugcat
 			module = GetModule(creature);
 			return module;
 		}
+		extension(Creature creature)
+		{
+			public CreatureModule Module => creature.GetModule();
+		}
 
 		public static WeaponModule GetModule(this Weapon weapon)
 		{
@@ -60,6 +64,10 @@ namespace MySlugcat
 		{
 			module = GetModule(weapon);
 			return module;
+		}
+		extension(Weapon weapon)
+		{
+			public WeaponModule Module => weapon.GetModule();
 		}
 	}
 
@@ -118,7 +126,7 @@ namespace MySlugcat
 					{
 						PenetrationAbility = true;
 						FrameAbility = true;
-						ArcLightningAbility = true;
+						//ArcLightningAbility = true;
 						DeflagrationAbility = true;
 						TrackingThrowAbility = true;
 					}
@@ -158,6 +166,10 @@ namespace MySlugcat
 			if (weapon.thrownBy != null)
 			{
 				weaponModule.Owner = new(weapon.thrownBy);
+			}
+			else if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy)
+			{
+				weapon.thrownBy = thrownBy;
 			}
 
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);

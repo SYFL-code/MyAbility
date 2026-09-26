@@ -71,11 +71,30 @@ namespace MySlugcat.Ability
 
 			try
 			{
-				creature.room.AddObject(new ExplosionSpikes(creature.room, creature.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, creature.ShortCutColor()));
-				creature.room.AddObject(new ShockWave(creature.mainBodyChunk.pos, 500f, 0.080f, 10, false));
+				Vector2 a = new Vector2(creature.mainBodyChunk.pos.x, creature.mainBodyChunk.pos.y);
+				Vector2 b = new Vector2(target.mainBodyChunk.pos.x, target.mainBodyChunk.pos.y);
 
-				target.room.AddObject(new ExplosionSpikes(target.room, target.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, target.ShortCutColor()));
-				target.room.AddObject(new ShockWave(target.mainBodyChunk.pos, 500f, 0.080f, 10, false));
+				bool sameRoom = creature.room == target.room && creature.room != null;
+
+				if (sameRoom)
+				{
+					creature.room?.AddObject(new FrameBlackMireFX(creature.room, a, b, creature.ShortCutColor(), false, false));
+					target.room.AddObject(new FrameBlackMireFX(target.room, b, b, target.ShortCutColor(), true, false));
+				}
+				else
+				{
+					if (creature.room != null)
+						creature.room.AddObject(new FrameBlackMireFX(creature.room, a, a, creature.ShortCutColor(), true, false));
+
+					if (target.room != null)
+						target.room.AddObject(new FrameBlackMireFX(target.room, b, b, target.ShortCutColor(), true, false));
+				}
+
+				//creature.room.AddObject(new ExplosionSpikes(creature.room, creature.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, creature.ShortCutColor()));
+				//creature.room.AddObject(new ShockWave(creature.mainBodyChunk.pos, 500f, 0.080f, 10, false));
+
+				//target.room.AddObject(new ExplosionSpikes(target.room, target.mainBodyChunk.pos, 14, 30f, 9f, 7f, 170f, target.ShortCutColor()));
+				//target.room.AddObject(new ShockWave(target.mainBodyChunk.pos, 500f, 0.080f, 10, false));
 			}
 			catch (Exception e)
 			{
@@ -374,6 +393,329 @@ namespace MySlugcat.Ability
 			orig(player);
 		}
 
+
+		public class FrameBlackMireFX : CosmeticSprite
+		{
+			private const int NormalLife = 34;
+			private const int HeavyLife = 54;
+
+			private readonly Vector2 fromPos;
+			private readonly Vector2 toPos;
+			private readonly Color color;
+			private readonly bool targetOnly;
+			private readonly bool heavy;
+
+			private readonly int life;
+			private int age;
+			private float lastT;
+			private float t;
+
+			private readonly System.Random rnd;
+
+			private const int FogCount = 14;
+			private const int TargetCount = 9;
+			private const int LineSegments = 11;
+
+			private readonly Vector2[] fogPos = new Vector2[FogCount];
+			private readonly Vector2[] fogLast = new Vector2[FogCount];
+			private readonly Vector2[] fogVel = new Vector2[FogCount];
+			private readonly float[] fogSize = new float[FogCount];
+			private readonly float[] fogDelay = new float[FogCount];
+
+			private readonly Vector2[] tarPos = new Vector2[TargetCount];
+			private readonly Vector2[] tarLast = new Vector2[TargetCount];
+			private readonly Vector2[] tarVel = new Vector2[TargetCount];
+			private readonly float[] tarSize = new float[TargetCount];
+
+			private readonly float[] lineJitter = new float[LineSegments];
+			private readonly float[] linePhase = new float[LineSegments];
+			private readonly float[] lineThick = new float[LineSegments];
+
+			public FrameBlackMireFX(Room room, Vector2 fromPos, Vector2 toPos, Color color, bool targetOnly, bool heavy)
+			{
+				this.room = room;
+				this.pos = fromPos;
+				this.lastPos = fromPos;
+				this.vel = Vector2.zero;
+
+				this.fromPos = fromPos;
+				this.toPos = toPos;
+				this.color = color;
+				this.targetOnly = targetOnly;
+				this.heavy = heavy;
+				this.life = heavy ? HeavyLife : NormalLife;
+
+				this.rnd = new System.Random(
+					(int)(fromPos.x * 13.37f) ^
+					(int)(fromPos.y * 71.13f) ^
+					(int)(toPos.x * 3.19f) ^
+					(int)(toPos.y * 9.73f) ^
+					(heavy ? 999983 : 31337)
+				);
+
+				Vector2 dir = toPos - fromPos;
+				if (dir.magnitude < 1f) dir = new Vector2(1f, 0f);
+				dir.Normalize();
+
+				for (int i = 0; i < FogCount; i++)
+				{
+					float a = (float)(rnd.NextDouble() * Math.PI * 2.0);
+					float r = (float)((rnd.NextDouble() * 26.0) + 5.0);
+					Vector2 off = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
+
+					fogPos[i] = fromPos + off;
+					fogLast[i] = fogPos[i];
+					fogVel[i] = (dir * (float)((rnd.NextDouble() * 2.0) + 0.8f)) + (off * 0.015f);
+					fogSize[i] = (float)((rnd.NextDouble() * 0.9) + 0.55);
+					fogDelay[i] = (float)(rnd.NextDouble() * 4.0);
+				}
+
+				for (int i = 0; i < TargetCount; i++)
+				{
+					float a = (float)(rnd.NextDouble() * Math.PI * 2.0);
+					float r = (float)((rnd.NextDouble() * 18.0) + 4.0);
+					Vector2 off = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
+
+					tarPos[i] = toPos + off;
+					tarLast[i] = tarPos[i];
+					tarVel[i] = (off.normalized * (float)((rnd.NextDouble() * 1.7) + 0.55f)) - (dir * 0.7f);
+					tarSize[i] = (float)((rnd.NextDouble() * 0.7) + 0.35);
+				}
+
+				for (int i = 0; i < LineSegments; i++)
+				{
+					lineJitter[i] = (float)((rnd.NextDouble() * 2.0) - 1.0);
+					linePhase[i] = (float)(rnd.NextDouble() * Math.PI * 2.0);
+					lineThick[i] = (float)((rnd.NextDouble() * 0.5) + 0.5);
+				}
+			}
+
+			public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+			{
+				int count = FogCount + TargetCount + 1;
+				if (!targetOnly) count += LineSegments;
+
+				sLeaser.sprites = new FSprite[count];
+
+				int i = 0;
+
+				for (int f = 0; f < FogCount; f++, i++)
+				{
+					sLeaser.sprites[i] = new FSprite("Futile_White")
+					{
+						anchorX = 0.5f,
+						anchorY = 0.5f,
+						color = Color.Lerp(color, Color.black, 0.82f),
+						alpha = 0.0f
+					};
+				}
+
+				if (!targetOnly)
+				{
+					for (int l = 0; l < LineSegments; l++, i++)
+					{
+						sLeaser.sprites[i] = new FSprite("Futile_White")
+						{
+							anchorX = 0.5f,
+							anchorY = 0f,
+							color = Color.Lerp(Color.black, color, 0.16f),
+							alpha = 0.0f
+						};
+					}
+				}
+
+				for (int k = 0; k < TargetCount; k++, i++)
+				{
+					sLeaser.sprites[i] = new FSprite("Futile_White")
+					{
+						anchorX = 0.5f,
+						anchorY = 0.5f,
+						color = Color.Lerp(color, Color.black, 0.55f),
+						alpha = 0.0f
+					};
+				}
+
+				sLeaser.sprites[i] = new FSprite("Futile_White")
+				{
+					anchorX = 0.5f,
+					anchorY = 0.5f,
+					color = Color.Lerp(color, Color.white, heavy ? 0.55f : 0.35f),
+					alpha = 0.0f
+				};
+
+				AddToContainer(sLeaser, rCam, null);
+			}
+
+			public override void Update(bool eu)
+			{
+				base.Update(eu);
+
+				age++;
+				lastT = t;
+				t = Mathf.Clamp01((float)age / (float)life);
+
+				Vector2 dir = toPos - fromPos;
+				if (dir.magnitude < 1f) dir = new Vector2(1f, 0f);
+				dir.Normalize();
+
+				float collapse = Mathf.Clamp01(age / 6f);
+				float jet = Mathf.Clamp01((age - 4) / 8f);
+
+				for (int f = 0; f < FogCount; f++)
+				{
+					fogLast[f] = fogPos[f];
+
+					Vector2 target = fromPos + (dir * (20f + (f * 2.5f)));
+					fogPos[f] = Vector2.Lerp(fogPos[f], target, collapse * 0.18f);
+
+					if (age > fogDelay[f])
+					{
+						fogVel[f] += dir * (0.34f * jet);
+						fogVel[f] *= 0.90f;
+						fogPos[f] += fogVel[f];
+					}
+
+					fogSize[f] *= 0.985f;
+				}
+
+				for (int k = 0; k < TargetCount; k++)
+				{
+					tarLast[k] = tarPos[k];
+					tarVel[k] *= 0.88f;
+					tarVel[k] += Vector2.down * 0.03f;
+					tarPos[k] += tarVel[k];
+					tarSize[k] *= 0.982f;
+				}
+
+				if (age >= life)
+				{
+					slatedForDeletetion = true;
+				}
+			}
+
+			public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+			{
+				base.DrawSprites(sLeaser, rCam, timeStacker, camPos);
+
+				if (sLeaser.deleteMeNextFrame) return;
+
+				float tt = Mathf.Lerp(lastT, t, timeStacker);
+
+				float fogIn = Mathf.Clamp01(tt * 4.5f);
+				float fogOut = Mathf.Clamp01((1f - tt) * 2.2f);
+				float fogAlpha = Mathf.Min(fogIn, fogOut) * (heavy ? 0.62f : 0.48f);
+
+				float lineIn = Mathf.Clamp01((tt - 0.08f) * 7f);
+				float lineOut = Mathf.Clamp01((1f - tt) * 2.6f);
+				float lineAlpha = Mathf.Min(lineIn, lineOut) * (heavy ? 0.72f : 0.55f);
+
+				float tarIn = Mathf.Clamp01((tt - 0.12f) * 6f);
+				float tarOut = Mathf.Clamp01((1f - tt) * 2.0f);
+				float tarAlpha = Mathf.Min(tarIn, tarOut) * (heavy ? 0.75f : 0.58f);
+
+				int i = 0;
+
+				for (int f = 0; f < FogCount; f++, i++)
+				{
+					FSprite s = (FSprite)sLeaser.sprites[i];
+					Vector2 p = Vector2.Lerp(fogLast[f], fogPos[f], timeStacker) - camPos;
+
+					s.x = p.x;
+					s.y = p.y;
+					s.scale = fogSize[f] * Mathf.Lerp(1.8f, 0.7f, tt);
+					s.rotation = (f * 37.7f) + (Mathf.Rad2Deg * tt * (f % 2 == 0 ? 0.8f : -0.6f));
+					s.alpha = fogAlpha * (0.55f + (0.45f * Mathf.Sin((tt * Mathf.PI) + f)));
+				}
+
+				if (!targetOnly)
+				{
+					Vector2 a = fromPos - camPos;
+					Vector2 b = toPos - camPos;
+					Vector2 d = b - a;
+					float len = d.magnitude;
+					if (len > 1f)
+					{
+						Vector2 nd = d / len;
+						Vector2 perp = new Vector2(-nd.y, nd.x);
+
+						for (int l = 0; l < LineSegments; l++, i++)
+						{
+							FSprite s = (FSprite)sLeaser.sprites[i];
+
+							float t0 = (float)l / LineSegments;
+							float t1 = (float)(l + 1) / LineSegments;
+
+							float wob0 = Mathf.Sin(linePhase[l] + (age * 0.31f)) * lineJitter[l] * 5.5f;
+							float wob1 = Mathf.Sin(linePhase[l] + ((age + 1) * 0.31f)) * lineJitter[l] * 5.5f;
+
+							Vector2 p0 = a + (d * t0) + (perp * wob0 * Mathf.Sin(t0 * Mathf.PI));
+							Vector2 p1 = a + (d * t1) + (perp * wob1 * Mathf.Sin(t1 * Mathf.PI));
+
+							Vector2 seg = p1 - p0;
+							float sl = seg.magnitude;
+							if (sl < 0.1f) sl = 0.1f;
+
+							float thick = Mathf.Lerp(1.8f, 7.5f, Mathf.Pow(t1, 2.2f)) * lineThick[l];
+							thick *= Mathf.Lerp(1f, 0.65f, tt);
+
+							s.x = (p0.x + p1.x) * 0.5f;
+							s.y = (p0.y + p1.y) * 0.5f;
+							s.rotation = (Mathf.Atan2(seg.y, seg.x) * Mathf.Rad2Deg) - 90f;
+							s.scaleX = thick / 16f;
+							s.scaleY = sl / 16f;
+							s.alpha = lineAlpha * Mathf.Lerp(0.55f, 1f, t1);
+						}
+					}
+					else
+					{
+						for (int l = 0; l < LineSegments; l++, i++)
+						{
+							sLeaser.sprites[i].alpha = 0f;
+						}
+					}
+				}
+
+				for (int k = 0; k < TargetCount; k++, i++)
+				{
+					FSprite s = (FSprite)sLeaser.sprites[i];
+					Vector2 p = Vector2.Lerp(tarLast[k], tarPos[k], timeStacker) - camPos;
+
+					s.x = p.x;
+					s.y = p.y;
+					s.scale = tarSize[k] * Mathf.Lerp(0.45f, 1.35f, Mathf.Sin(tt * Mathf.PI));
+					s.rotation = (k * 41.3f) - (Mathf.Rad2Deg * tt * 0.7f);
+					s.alpha = tarAlpha;
+				}
+
+				FSprite core = (FSprite)sLeaser.sprites[i];
+				Vector2 cp = toPos - camPos;
+				float corePulse = Mathf.Clamp01((tt - 0.10f) * 8f) * Mathf.Clamp01((1f - tt) * 3.2f);
+
+				core.x = cp.x;
+				core.y = cp.y;
+				core.rotation = age * 3f;
+				core.scaleX = Mathf.Lerp(0.25f, heavy ? 1.0f : 0.65f, corePulse);
+				core.scaleY = Mathf.Lerp(0.25f, heavy ? 1.0f : 0.65f, corePulse);
+				core.alpha = corePulse * (heavy ? 0.65f : 0.38f);
+			}
+
+			public override void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
+			{
+			}
+
+			public override void AddToContainer(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, FContainer? newContatiner)
+			{
+				if (newContatiner == null)
+				{
+					newContatiner = rCam.ReturnFContainer("Water");
+				}
+				foreach (FSprite fsprite in sLeaser.sprites)
+				{
+					fsprite.RemoveFromContainer();
+					newContatiner.AddChild(fsprite);
+				}
+			}
+		}
 
 	}
 }

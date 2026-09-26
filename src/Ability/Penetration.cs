@@ -21,12 +21,13 @@ using System.Windows.Forms;
 using UnityEngine;
 using UnityEngine.Networking.Types;
 using Watcher;
+using static MySlugcat.Ability.ArcLightning;
 using static PhysicalObject;
 
 namespace MySlugcat.Ability
 {
 	// 穿透能力
-	internal static class Penetration
+	public static class Penetration
 	{
 		public static bool PenetrateHit<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 			where O: Delegate
@@ -46,190 +47,258 @@ namespace MySlugcat.Ability
 			weapon.GetModule(out var weaponModule);
 			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy && thrownBy.GetModule().PenetrationAbility)
 			{
-				weapon.thrownBy = thrownBy;
-
 				Room room = weapon.room;
-				if (result.obj is Creature creature && room != null)
+				if (room != null && weapon is not ExplosiveSpear && weapon is not ScavengerBomb)
 				{
-					weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
-					if (stuckInObject != creature || weaponModule.stuckInObjectTime > 3)
+					Spear? spear = weapon as Spear;
+
+					Creature? creature = result.obj as Creature;
+					if (creature != null)
 					{
-						weaponModule.stuckInObject = new(creature);
-						weaponModule.stuckInObjectTime = 1;
-						weaponModule.penetrateCount += 1;
-
-						//if (result.obj is Lizard lizard)
-						//{
-						//	Vector2 attackDir = weapon.firstChunk.vel.normalized; // 攻击方向
-						//	if (lizard.HitHeadShield(attackDir))
-						//	{
-						//		//weaponModule.penetrateCount += 1;
-						//		weapon.firstChunk.vel *= 0.8f;
-						//	}
-						//	else if (lizard.HitInMouth(attackDir))
-						//	{
-						//		creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 2f), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.25f, 60f);
-						//	}
-						//}
-
-						// 第1次: 100% , 第2次: 82%, 第3次: 64% ... 直到最低 15%
-						float successRate = 0.99f - (0.18f * (weaponModule.penetrateCount - 1));
-						successRate = Mathf.Clamp(successRate, 0.15f, 1f);
-
-						float roll = UnityEngine.Random.value;
-
-						Log.LogInfo($"穿透次数: {weaponModule.penetrateCount}, 成功率: {successRate:P2}, 随机值: {roll:F2}");
-
-						if (roll > successRate)
+						weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
+						if (stuckInObject != creature || weaponModule.stuckInObjectTime > 3)
 						{
-							return orig_HitSomething(orig_, weapon, result, eu);
+							weaponModule.stuckInObject = new(creature);
+							weaponModule.stuckInObjectTime = 1;
+							weaponModule.penetrateCount++;
+
+
+							//if (result.obj is Lizard lizard)
+							//{
+							//	Vector2 attackDir = weapon.firstChunk.vel.normalized; // 攻击方向
+							//	if (lizard.HitHeadShield(attackDir))
+							//	{
+							//		//weaponModule.penetrateCount += 1;
+							//		weapon.firstChunk.vel *= 0.8f;
+							//	}
+							//	else if (lizard.HitInMouth(attackDir))
+							//	{
+							//		creature.Violence(weapon.firstChunk, (weapon.firstChunk.vel * weapon.firstChunk.mass * 2f),
+							//		result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.25f, 60f);
+							//	}
+							//}
+
+							/*
+							//if (weapon is Spear spear)
+							//{
+							//	spear.stuckInObject = creature;
+
+							//	float spearDamageBonus = 1f;
+							//	switch (player.slugcatStats.throwingSkill)
+							//	{
+							//		case 0:
+							//			spearDamageBonus = 0.6f + (0.3f * Mathf.Pow(UnityEngine.Random.value, 4f));
+							//			break;
+
+							//		case 1:
+							//			spearDamageBonus = 1f;
+							//			break;
+
+							//		case 2:
+							//			spearDamageBonus = 1.25f;
+							//			break;
+
+							//		case 3:
+							//			spearDamageBonus = 1.5f;
+							//			break;
+
+							//		default:
+							//			spearDamageBonus = 1f;
+							//			break;
+							//	}
+
+							//	float MaxspearDamageBonus = Mathf.Max(spear.spearDamageBonus, spearDamageBonus);
+							//	MaxspearDamageBonus *= Mathf.Max(0.6f, 1.1f - (0.1f * weaponModule.penetrateCount));
+
+							//	if (spear.bugSpear)
+							//	{
+							//		MaxspearDamageBonus *= 3f;
+							//	}
+
+							//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 2f), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, MaxspearDamageBonus, 60f);
+
+							//	if (ModManager.MSC && result.obj is Player player2)
+							//	{
+							//		player2.playerState.permanentDamageTracking += MaxspearDamageBonus / player2.Template.baseDamageResistance;
+							//		if (player2.playerState.permanentDamageTracking >= 1.0)
+							//		{
+							//			player2.Die();
+							//		}
+							//	}
+							//	room.PlaySound(SoundID.Spear_Stick_In_Creature, weapon.firstChunk);
+							//}
+							//else if (weapon is Rock)
+							//{
+							//	weapon.vibrate = 20;
+
+							//	float stunBonus = 45f;
+							//	if (ModManager.MMF && MMF.cfgIncreaseStuns.Value && (result.obj is Cicada || result.obj is LanternMouse || (ModManager.MSC && result.obj is Yeek)))
+							//	{
+							//		stunBonus = 90f;
+							//	}
+							//	if (ModManager.MSC && room.game.IsArenaSession && room.game.GetArenaGameSession.chMeta != null)
+							//	{
+							//		stunBonus = 90f;
+							//	}
+
+							//	stunBonus *= Mathf.Max(0.5f, 1.1f - (0.15f * weaponModule.penetrateCount));
+							//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.01f, stunBonus);
+
+							//	room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
+							//}
+							//else if (weapon is ScavengerBomb)
+							//{
+							//	weapon.vibrate = 20;
+
+							//	float damageBonus = 0.8f;
+							//	float stunBonus = 85f;
+
+							//	damageBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							//	stunBonus *= Mathf.Max(0.5f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Explosion, damageBonus, stunBonus);
+
+							//	room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
+							//}
+							//else if (ModManager.Watcher && weapon is Boomerang)
+							//{
+							//	weapon.vibrate = 20;
+
+							//	float damageBonus = 0.15f;
+							//	float stunBonus = 45f;
+							//	if (ModManager.MMF && MMF.cfgIncreaseStuns.Value && (result.obj is Cicada || result.obj is LanternMouse || (ModManager.MSC && result.obj is Yeek)))
+							//	{
+							//		stunBonus = 90f;
+							//	}
+							//	if (ModManager.MSC && room.game.IsArenaSession && room.game.GetArenaGameSession.chMeta != null)
+							//	{
+							//		stunBonus = 90f;
+							//	}
+
+							//	damageBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							//	stunBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
+							//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, damageBonus, stunBonus);
+
+							//	room.PlaySound(WatcherEnums.WatcherSoundID.Boomerang_Collide_Creature, weapon.firstChunk);
+							//}
+							//else
+							//{
+							//	float damageBonus = 0.15f;
+							//	float stunBonus = 20f;
+
+							//	damageBonus *= Mathf.Max(0.1f, 1.1f - (0.3f * weaponModule.penetrateCount));
+							//	stunBonus *= Mathf.Max(0.05f, 1.1f - (0.3f * weaponModule.penetrateCount));
+							//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, damageBonus, stunBonus);
+
+							//	room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
+							//}
+							//weapon.firstChunk.vel *= 0.8f;
+
+							////震动强度
+							//weapon.vibrate = 20;
+
+							// 屏幕震动
+							//room.ScreenMovement(null, dir, strength);
+							*/
 						}
-
-
-						Vector2 preHitVel = weapon.firstChunk.vel;
-						Vector2 preHitPos = weapon.firstChunk.pos;
-
-						bool ret = orig_HitSomething(orig_, weapon, result, eu);
-						creature.SetKillTag(thrownBy.abstractCreature);
-
-						weapon.ChangeMode(Weapon.Mode.Thrown);
-						weapon.firstChunk.vel = preHitVel * 0.9f;
-						weapon.firstChunk.pos = preHitPos + (preHitVel.normalized * 5f);
-						//weapon.thrownBy = player;
-
-
-						//if (weapon is Spear spear)
-						//{
-						//	spear.stuckInObject = creature;
-
-						//	float spearDamageBonus = 1f;
-						//	switch (player.slugcatStats.throwingSkill)
-						//	{
-						//		case 0:
-						//			spearDamageBonus = 0.6f + (0.3f * Mathf.Pow(UnityEngine.Random.value, 4f));
-						//			break;
-
-						//		case 1:
-						//			spearDamageBonus = 1f;
-						//			break;
-
-						//		case 2:
-						//			spearDamageBonus = 1.25f;
-						//			break;
-
-						//		case 3:
-						//			spearDamageBonus = 1.5f;
-						//			break;
-
-						//		default:
-						//			spearDamageBonus = 1f;
-						//			break;
-						//	}
-
-						//	float MaxspearDamageBonus = Mathf.Max(spear.spearDamageBonus, spearDamageBonus);
-						//	MaxspearDamageBonus *= Mathf.Max(0.6f, 1.1f - (0.1f * weaponModule.penetrateCount));
-
-						//	if (spear.bugSpear)
-						//	{
-						//		MaxspearDamageBonus *= 3f;
-						//	}
-
-						//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 2f), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, MaxspearDamageBonus, 60f);
-
-						//	if (ModManager.MSC && result.obj is Player player2)
-						//	{
-						//		player2.playerState.permanentDamageTracking += MaxspearDamageBonus / player2.Template.baseDamageResistance;
-						//		if (player2.playerState.permanentDamageTracking >= 1.0)
-						//		{
-						//			player2.Die();
-						//		}
-						//	}
-						//	room.PlaySound(SoundID.Spear_Stick_In_Creature, weapon.firstChunk);
-						//}
-						//else if (weapon is Rock)
-						//{
-						//	weapon.vibrate = 20;
-
-						//	float stunBonus = 45f;
-						//	if (ModManager.MMF && MMF.cfgIncreaseStuns.Value && (result.obj is Cicada || result.obj is LanternMouse || (ModManager.MSC && result.obj is Yeek)))
-						//	{
-						//		stunBonus = 90f;
-						//	}
-						//	if (ModManager.MSC && room.game.IsArenaSession && room.game.GetArenaGameSession.chMeta != null)
-						//	{
-						//		stunBonus = 90f;
-						//	}
-
-						//	stunBonus *= Mathf.Max(0.5f, 1.1f - (0.15f * weaponModule.penetrateCount));
-						//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, 0.01f, stunBonus);
-
-						//	room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
-						//}
-						//else if (weapon is ScavengerBomb)
-						//{
-						//	weapon.vibrate = 20;
-
-						//	float damageBonus = 0.8f;
-						//	float stunBonus = 85f;
-
-						//	damageBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
-						//	stunBonus *= Mathf.Max(0.5f, 1.1f - (0.2f * weaponModule.penetrateCount));
-						//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Explosion, damageBonus, stunBonus);
-
-						//	room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
-						//}
-						//else if (ModManager.Watcher && weapon is Boomerang)
-						//{
-						//	weapon.vibrate = 20;
-
-						//	float damageBonus = 0.15f;
-						//	float stunBonus = 45f;
-						//	if (ModManager.MMF && MMF.cfgIncreaseStuns.Value && (result.obj is Cicada || result.obj is LanternMouse || (ModManager.MSC && result.obj is Yeek)))
-						//	{
-						//		stunBonus = 90f;
-						//	}
-						//	if (ModManager.MSC && room.game.IsArenaSession && room.game.GetArenaGameSession.chMeta != null)
-						//	{
-						//		stunBonus = 90f;
-						//	}
-
-						//	damageBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
-						//	stunBonus *= Mathf.Max(0.4f, 1.1f - (0.2f * weaponModule.penetrateCount));
-						//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, damageBonus, stunBonus);
-
-						//	room.PlaySound(WatcherEnums.WatcherSoundID.Boomerang_Collide_Creature, weapon.firstChunk);
-						//}
-						//else
-						//{
-						//	float damageBonus = 0.15f;
-						//	float stunBonus = 20f;
-
-						//	damageBonus *= Mathf.Max(0.1f, 1.1f - (0.3f * weaponModule.penetrateCount));
-						//	stunBonus *= Mathf.Max(0.05f, 1.1f - (0.3f * weaponModule.penetrateCount));
-						//	creature.Violence(weapon.firstChunk, new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass), result.chunk, result.onAppendagePos, Creature.DamageType.Stab, damageBonus, stunBonus);
-
-						//	room.PlaySound(SoundID.Rock_Hit_Creature, weapon.firstChunk);
-						//}
-						//weapon.firstChunk.vel *= 0.8f;
-
-						////震动强度
-						//weapon.vibrate = 20;
-
-						// 屏幕震动
-						//room.ScreenMovement(null, dir, strength);
+						else
+						{
+							weaponModule.stuckInObjectTime++;
+							return false;
+						}
 					}
 					else
 					{
-						weaponModule.stuckInObjectTime += 1;
+						weaponModule.stuckInObject = new(result.obj);
+						weaponModule.stuckInObjectTime = 1;
+						weaponModule.penetrateCount++;
 					}
+
+					// 第1次: 100% , 第2次: 82%, 第3次: 64% ... 直到最低 15%
+					float successRate = 0.99f - (0.18f * (weaponModule.penetrateCount - 1));
+					successRate = Mathf.Clamp(successRate, 0.15f, 1f);
+
+					float roll = UnityEngine.Random.value;
+
+					Log.LogInfo($"穿透次数: {weaponModule.penetrateCount}, 成功率: {successRate:P2}, 随机值: {roll:F2}");
+
+					if (roll > successRate)
+					{
+						return orig_HitSomething(orig_, weapon, result, eu);
+					}
+
+
+
+					Vector2 preHitVel = weapon.firstChunk.vel;
+					Vector2 preHitPos = weapon.firstChunk.pos;
+					float preBonus = spear?.spearDamageBonus ?? 1f;
+					float preRotationSpeed = spear?.rotationSpeed ?? 0f;
+					Vector2 preRotation = spear?.rotation ?? Vector2.zero;
+
+
+					result.obj.GetPenetrationModule().Penetrated = true;
+
+					bool ret = orig_HitSomething(orig_, weapon, result, eu);
+					//creature?.SetKillTag(thrownBy.abstractCreature);
+
+					result.obj.GetPenetrationModule().Penetrated = false;
+					/*if (result.obj is Lizard lizard && result.chunk != null && result.chunk.index == 0)
+					{
+						Vector2 attackDir = preHitVel.normalized;
+						if (lizard.HitHeadShield(attackDir))
+						{
+							float damage = preBonus * 0.9f;
+							float stunBonus = 20f;
+
+							float num = damage / lizard.Template.baseDamageResistance;
+							float num2 = ((damage * 30f) + stunBonus) / lizard.Template.baseStunResistance;
+
+							var type = Creature.DamageType.Stab;
+							if (type.Index != -1)
+							{
+								if (lizard.Template.damageRestistances[type.Index, 0] > 0f)
+								{
+									num /= lizard.Template.damageRestistances[type.Index, 0];
+								}
+								if (lizard.Template.damageRestistances[type.Index, 1] > 0f)
+								{
+									num2 /= lizard.Template.damageRestistances[type.Index, 1];
+								}
+							}
+
+							num *= 1.5f;
+							num2 = Mathf.Min(num2 * 2f, 120f);
+							lizard.LizardState.throatHealth -= num;
+
+							num2 *= 1f + (Mathf.InverseLerp(0.75f, 0f, lizard.LizardState.health) * UnityEngine.Random.value);
+							lizard.Stun((int)num2);
+
+							// 补伤害
+							//if (lizard.State is HealthState hs)
+							//	hs.health -= preBonus * 0.9f / lizard.Template.baseDamageResistance;
+
+							// 头盾减速感
+							weapon.firstChunk.vel = preHitVel * 0.7f;   // 比普通穿透更慢
+						}
+					}*/
+
+					weapon.ChangeMode(Weapon.Mode.Thrown);
+					weapon.firstChunk.vel = preHitVel * 0.9f;
+					weapon.firstChunk.pos = preHitPos + (preHitVel.normalized * 5f);
+					if (spear != null)
+					{
+						spear.spearDamageBonus = preBonus * 0.9f;
+						spear.rotation = preRotation;                 // 恢复朝向
+						spear.rotationSpeed = preRotationSpeed;       // 恢复角速度（通常是 0）
+						spear.setRotation = preHitVel.normalized;     // 下一帧对齐飞行方向
+					}
+
+
+					//result.obj = null;
+					return false;
 				}
-				//result.obj = null;
-				return false;
 			}
-			else
-			{
-				return orig_HitSomething(orig_, weapon, result, eu);
-			}
+
+			return orig_HitSomething(orig_, weapon, result, eu);
 		}
 		public static bool orig_HitSomething<O, W>(O orig_, W weapon, SharedPhysics.CollisionResult result, bool eu)
 			where O : Delegate
@@ -297,6 +366,29 @@ namespace MySlugcat.Ability
 			}
 		}
 
+		public static bool HitInMouth(On.Lizard.orig_HitInMouth orig, Lizard lizard, Vector2 direction)
+		{
+			lizard.GetPenetrationModule(out var module);
+			if (module.Penetrated)
+			{
+				return true;
+			}
+			return orig(lizard, direction);
+		}
+
+		public class PenetrationModule
+		{
+			public bool Penetrated;
+		}
+		public static PenetrationModule GetPenetrationModule(this PhysicalObject obj, out PenetrationModule module)
+		{
+			module = GetPenetrationModule(obj);
+			return module;
+		}
+		public static PenetrationModule GetPenetrationModule(this PhysicalObject obj)
+		{
+			return ModuleManager.Get(obj, c => new PenetrationModule());
+		}
 
 	}
 }
