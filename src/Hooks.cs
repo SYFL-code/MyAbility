@@ -209,23 +209,15 @@ public static class Hooks
 		}
 		#endregion
 
-		#region StalwartShell
+		#region CrystalShield
 		{
 			HookManager.Register(
-				Hook: () => On.Creature.Update += StalwartShell.Creature_Update,
-				UnHook: () => On.Creature.Update -= StalwartShell.Creature_Update
+				Hook: () => On.Creature.Update += CrystalShield.Creature_Update,
+				UnHook: () => On.Creature.Update -= CrystalShield.Creature_Update
 			);
 			HookManager.Register(
-				Hook: () => HitSomething += StalwartShell.StalwartShell_HitSomething,
-				UnHook: () => HitSomething -= StalwartShell.StalwartShell_HitSomething
-			);
-			HookManager.Register(
-				Hook: () => On.GraphicsModule.InitiateSprites += StalwartShell.InitiateSprites,
-				UnHook: () => On.GraphicsModule.InitiateSprites -= StalwartShell.InitiateSprites
-			);
-			HookManager.Register(
-				Hook: () => On.GraphicsModule.DrawSprites += StalwartShell.DrawSprites,
-				UnHook: () => On.GraphicsModule.DrawSprites -= StalwartShell.DrawSprites
+				Hook: () => HitSomething += CrystalShield.CrystalShield_HitSomething,
+				UnHook: () => HitSomething -= CrystalShield.CrystalShield_HitSomething
 			);
 		}
 		#endregion
