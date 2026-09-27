@@ -23,8 +23,6 @@ using UnityEngine;
 using Watcher;
 using static Menu.Remix.InternalOI;
 using static MonoMod.InlineRT.MonoModRule;
-using Color = UnityEngine.Color;
-using Random = UnityEngine.Random;
 
 namespace MySlugcat.Ability
 {

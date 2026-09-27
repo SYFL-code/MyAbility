@@ -22,12 +22,11 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using UnityEngine;
 using Watcher;
+using static CommonUtils.Core.UnifiedHookInstaller;
 using static MySlugcat.Ability.Camouflage;
 using static PhysicalObject;
 using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
 using static UnityEngine.UI.Image;
-using Color = UnityEngine.Color;
-using Random = UnityEngine.Random;
 
 namespace MySlugcat.Ability
 {
@@ -99,7 +98,7 @@ namespace MySlugcat.Ability
 					HitAnotherPhysicalObject(creature, weapon, false);
 
 					creature.Shield.lastHitOffset = weapon.firstChunk.pos - creature.mainBodyChunk.pos;
-					HitEffect(creature, weapon.firstChunk.pos + (weapon.firstChunk.vel * 2f), weapon.firstChunk.vel);
+					HitEffect(creature, weapon.firstChunk.pos, weapon.firstChunk.vel);
 					AddDamage(creature, weapon.HeavyWeapon ? 0.5f : 0.2f);
 
 					return false;
@@ -113,6 +112,60 @@ namespace MySlugcat.Ability
 			where W : Weapon
 		{
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
+		}
+
+		public class DamageReductionHandler : IViolenceHandler
+		{
+			public bool OnPrefix(Creature self, ref BodyChunk source, ref Vector2? directionAndMomentum,
+								  ref BodyChunk hitChunk, ref PhysicalObject.Appendage.Pos hitAppendage,
+								  ref Creature.DamageType type, ref float damage, ref float stunBonus)
+			{
+				Log.LogDebug("");
+
+				Log.LogVar(self, source);
+				Log.LogVar(directionAndMomentum, hitChunk, hitAppendage);
+				Log.LogVar(type, damage, stunBonus);
+				if (self.Module.CrystalShieldAbility && self.Shield.validity)
+				{
+					if (type == Creature.DamageType.Explosion)
+					{
+						//damage *= 0.5f;  // 减伤 50%
+
+						Log.LogVar(self.Shield.damage);
+
+						// 爆炸伤害转移到盾的耐久上
+						//damage = Mathf.Max(damage - Mathf.Max(1f - self.Shield.damage, 0f), 0f);
+						AddDamage(self, damage);
+						damage = 0f;
+
+						Log.LogVar(self.Shield.damage);
+
+						// 保留部分击退，让玩家能感受到爆炸的推力
+						if (directionAndMomentum.HasValue)
+						{
+							directionAndMomentum *= 0.2f;
+						}
+						for (int i = 0; i < self.bodyChunks.Length; i++)
+						{
+							self.bodyChunks[i].vel *= 0.2f;
+						}
+
+						// 可选：保留部分眩晕
+						stunBonus *= 0.3f;
+						//stunBonus = Mathf.Min(stunBonus, 30f);
+
+						self.stun = 0;
+					}
+				}
+				Log.LogDebug("");
+
+				return true;
+			}
+
+			public void OnPostfix(Creature self, BodyChunk source, Vector2? dir,
+								   BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage,
+								   Creature.DamageType type, float damage, float stunBonus)
+			{ }
 		}
 
 		public static void Creature_Update(On.Creature.orig_Update orig, Creature creature, bool eu)
@@ -191,20 +244,24 @@ namespace MySlugcat.Ability
 		public static void HitEffect(Creature creature, Vector2 impactPos, Vector2 impactVelocity)
 		{
 			var num = UnityEngine.Random.Range(3, 8);
+			Color color = creature.ShortCutColor();
 			for (int k = 0; k < num; k++)
 			{
 				Vector2 pos = impactPos + (Custom.DegToVec(Rand * 360f) * 5f * Rand);
 				Vector2 vel = (-impactVelocity * -0.1f) + (Custom.DegToVec(Rand * 360f) * Mathf.Lerp(0.2f, 0.4f, Rand) * impactVelocity.magnitude);
-				creature.room.AddObject(new Spark(pos, vel, new Color(1f, 1f, 1f), null, 10, 170));
+				creature.room.AddObject(new Spark(pos, vel, color, null, 10, 170));
 			}
 
-			creature.room.AddObject(new StationaryEffect(impactPos, new Color(1f, 1f, 1f), null, StationaryEffect.EffectType.FlashingOrb));
+			creature.room.AddObject(new StationaryEffect(impactPos, color, null, StationaryEffect.EffectType.FlashingOrb));
 		}
 		public static void AddDamage(Creature creature, float damage)
 		{
 			var Shield = creature.Shield;
 
 			Shield.damage += damage * 0.2f;
+
+			if (Shield.damage >= 0.9f && Shield.validity && UnityEngine.Random.value < 0.15f)
+				Shatter(creature, Shield.lastHitOffset + creature.mainBodyChunk.pos);
 			if (Shield.damage > 1)
 				Shield.damage = 1;
 		}
@@ -299,14 +356,6 @@ namespace MySlugcat.Ability
 
 			public Shield(Creature creature)
 			{
-
-				if (Plugin.DebugMode)
-				{
-					//if (creature is Player)
-					//{
-					//	damage = -99999;
-					//}
-				}
 			}
 		}
 		extension(Creature creature)
@@ -356,7 +405,7 @@ namespace MySlugcat.Ability
 				public float phase;         // 呼吸/闪烁用的随机相位
 				public float radX, radY;    // 环绕椭圆半径
 				public float size;          // 板尺寸
-				public TriangleMesh mesh;
+				public TriangleMesh mesh = null!;
 				public bool broken;
 
 				public Plate(BodyChunk chunk, float baseAngle)
@@ -450,6 +499,8 @@ namespace MySlugcat.Ability
 
 				float rot = Mathf.Lerp(lastRotation, rotation, timeStacker);
 				Color baseCol = Color.Lerp(creature.ShortCutColor(), new Color(0.85f, 0.72f, 0.42f), 0.55f);
+				// 冰蓝基底，少量混入生物色避免完全脱节
+				//Color baseCol = Color.Lerp(new Color(0.55f, 0.85f, 1f), creature.ShortCutColor(), 0.25f);
 
 				foreach (var plate in plates)
 				{
@@ -474,10 +525,14 @@ namespace MySlugcat.Ability
 						mesh.MoveVertice(k, center + (Custom.DegToVec(a + (k * 60f)) * size) - camPos);
 					mesh.MoveVertice(6, center - (dir * size * 0.2f) - camPos); // 中心内凹，伪造球面
 
-					// 明暗：背侧暗、前侧亮；中心高光
+					// 闪烁：水晶的呼吸高光
+					float shimmer = 0.85f + (0.15f * Mathf.Sin((breathe * 2f) + plate.phase));
+
 					float shade = 0.7f + (0.35f * ((depth * 0.5f) + 0.5f));
-					Color rim = baseCol * shade;
-					Color mid = Color.Lerp(baseCol * (shade + 0.15f), Color.white, 0.3f);
+					Color rim = baseCol * shade * shimmer;
+					rim.a = 0.45f + (0.15f * depth);              // 边缘半透明
+					Color mid = Color.Lerp(baseCol * (shade + 0.3f), Color.white, 0.45f);
+					mid.a = 0.85f;                               // 中心近乎实心的发光核
 					for (int k = 0; k < 6; k++) mesh.verticeColors[k] = rim;
 					mesh.verticeColors[6] = mid;
 				}
@@ -518,22 +573,39 @@ namespace MySlugcat.Ability
 
 			private void SpawnDebris(Vector2 pos, Vector2 vel)
 			{
-				Color baseCol = Color.Lerp(creature.ShortCutColor(), new Color(0.85f, 0.72f, 0.42f), 0.55f);
+				//Color baseCol = Color.Lerp(creature.ShortCutColor(), new Color(0.85f, 0.72f, 0.42f), 0.55f);
+				Color baseCol = Color.Lerp(new Color(0.55f, 0.85f, 1f), creature.ShortCutColor(), 0.25f);
+				//Color.RGBToHSV(baseCol, out float h, out float s, out float v);
+
+				//// 琥珀色甲壳碎屑，带物理反弹
+				//room.AddObject(new CentipedeShell(
+				//	pos, vel + (Custom.RNV() * Random.value * 7f),
+				//	//0.085f + (Random.value * 0.03f), 0.55f + (Random.value * 0.2f),
+				//	h, 0.55f + (Random.value * 0.2f),
+				//	0.28f, 0.32f));
+
+				//for (int i = 0; i < 4; i++)
+				//{
+				//	room.AddObject(new Spark(
+				//		pos + (Custom.RNV() * 4f),
+				//		Custom.RNV() * Mathf.Lerp(2f, 6f, Random.value),
+				//		new Color(1f, 1f, 1f), null, 8, 120));
+				//}
+
 				Color.RGBToHSV(baseCol, out float h, out float s, out float v);
 
-				// 琥珀色甲壳碎屑，带物理反弹
 				room.AddObject(new CentipedeShell(
 					pos, vel + (Custom.RNV() * Random.value * 7f),
-					//0.085f + (Random.value * 0.03f), 0.55f + (Random.value * 0.2f),
-					h, 0.55f + (Random.value * 0.2f),
+					h, 0.35f + (Random.value * 0.15f),        // 低饱和，冰晶感
 					0.28f, 0.32f));
 
+				// 火花换成冰蓝色
+				Color iceSpark = Color.Lerp(baseCol, Color.white, 0.5f);
 				for (int i = 0; i < 4; i++)
 				{
-					room.AddObject(new Spark(
-						pos + (Custom.RNV() * 4f),
+					room.AddObject(new Spark(pos + (Custom.RNV() * 4f),
 						Custom.RNV() * Mathf.Lerp(2f, 6f, Random.value),
-						new Color(1f, 1f, 1f), null, 8, 120));
+						iceSpark, null, 8, 120));
 				}
 			}
 		}

@@ -147,8 +147,8 @@ namespace MySlugcat
 		public bool ArcLightningAbility = false;
 		public bool DeflagrationAbility = false;
 		public bool CrystalShieldAbility = false;
-		//public bool StalwartShellAbility = false;
-		public bool TrackingThrowAbility = false;
+        public bool StalwartScute = false;
+        public bool TrackingThrowAbility = false;
 
 		public CreatureModule(Creature creature) :
 			base(creature)
@@ -171,8 +171,9 @@ namespace MySlugcat
 				else
 				{
 				}
-				CrystalShieldAbility = true;
-			}
+				//CrystalShieldAbility = true;
+				StalwartScute = true;
+            }
 		}
 	}
 

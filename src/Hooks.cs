@@ -209,6 +209,27 @@ public static class Hooks
 		}
 		#endregion
 
+		#region StalwartScute
+		{
+			HookManager.Register(
+				Hook: () => On.Creature.Update += StalwartScute.Creature_Update,
+				UnHook: () => On.Creature.Update -= StalwartScute.Creature_Update
+			);
+			HookManager.Register(
+				Hook: () => On.Lizard.SpearStick += StalwartScute.Lizard_SpearStick,
+				UnHook: () => On.Lizard.SpearStick -= StalwartScute.Lizard_SpearStick
+			);
+			HookManager.Register(
+				Hook: () => On.Lizard.Violence += StalwartScute.Lizard_Violence,
+				UnHook: () => On.Lizard.Violence -= StalwartScute.Lizard_Violence
+			);
+			HookManager.Register(
+				Hook: () => On.Lizard.InitiateGraphicsModule += StalwartScute.Lizard_InitiateGraphicsModule,
+				UnHook: () => On.Lizard.InitiateGraphicsModule -= StalwartScute.Lizard_InitiateGraphicsModule
+			);
+		}
+		#endregion
+
 		#region CrystalShield
 		{
 			HookManager.Register(
@@ -218,6 +239,10 @@ public static class Hooks
 			HookManager.Register(
 				Hook: () => HitSomething += CrystalShield.CrystalShield_HitSomething,
 				UnHook: () => HitSomething -= CrystalShield.CrystalShield_HitSomething
+			);
+			HookManager.Register(
+				Hook: () => UnifiedHookInstaller.Register(new CrystalShield.DamageReductionHandler()),
+				UnHook: () => UnifiedHookInstaller.Unregister(new CrystalShield.DamageReductionHandler())
 			);
 		}
 		#endregion
@@ -371,6 +396,20 @@ public static class Hooks
 				Hook: () => On.Weapon.Thrown += ArcLightning.Weapon_Thrown,
 				UnHook: () => On.Weapon.Thrown -= ArcLightning.Weapon_Thrown
 			);
+		}
+		#endregion
+
+		#region UnifiedHookInstaller
+		try
+		{
+			HookManager.Register(
+				Hook: () => UnifiedHookInstaller.Install(),
+				UnHook: () => UnifiedHookInstaller.Uninstall()
+			);
+		}
+		catch (Exception ex)
+		{
+			Log.LogError($"Error registering hooks: {ex}");
 		}
 		#endregion
 
