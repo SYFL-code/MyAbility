@@ -375,6 +375,10 @@ public static class Hooks
 				Hook: () => HitSomething += ArcLightning.ArcLightning_HitSomething,
 				UnHook: () => HitSomething -= ArcLightning.ArcLightning_HitSomething
 			);
+			HookManager.Register(
+				Hook: () => On.Lizard.Bite += ArcLightning.Lizard_Bite,
+				UnHook: () => On.Lizard.Bite -= ArcLightning.Lizard_Bite
+			);
 			//HookManager.Register(
 			//	Hook: () => On.Weapon.HitSomething += ArcLightning.ArcLightning_HitSomething,
 			//	UnHook: () => On.Weapon.HitSomething -= ArcLightning.ArcLightning_HitSomething

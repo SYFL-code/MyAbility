@@ -54,7 +54,7 @@ namespace MySlugcat.Ability
 						{
 							List<Creature> exclude = [thrownBy];
 							// 执行连锁
-							ArcTriggerChain(weapon, hitCreature, thrownBy, weapon.firstChunk.vel.normalized, ref exclude, 5);
+							ArcTriggerChain(hitCreature, weapon.firstChunk.vel.normalized, thrownBy, weapon, ref exclude, 5);
 						}
 					}
 				}
@@ -68,6 +68,23 @@ namespace MySlugcat.Ability
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
 
+		public static void Lizard_Bite(On.Lizard.orig_Bite orig, Lizard lizard, BodyChunk chunk)
+		{
+			if (lizard.Module.ArcLightningAbility)
+			{
+				if (chunk?.owner is Creature biteCreature)
+				{
+					Vector2 direction = (lizard.graphicsModule as LizardGraphics)?.head.vel.normalized ??
+						(biteCreature.mainBodyChunk.pos - lizard.mainBodyChunk.pos).normalized;
+
+					List <Creature> exclude = [lizard];
+					// 执行连锁
+					ArcTriggerChain(biteCreature, direction, lizard, null, ref exclude, 4);
+				}
+			}
+
+			orig.Invoke(lizard, chunk);
+		}
 
 		public static float ChainRadius = 14f * 20f; // 14格
 		public static int MaxTargets = 5;
@@ -75,7 +92,7 @@ namespace MySlugcat.Ability
 		public static float StunBonus = 60f;
 		public static float ConeHalfAngle = 60f;           // 半角，总角度为120°
 
-		private static void ArcTriggerChain(Weapon weapon, Creature start, Creature thrownBy, Vector2 direction, ref List<Creature> exclude, int remainingChains)
+		private static void ArcTriggerChain(Creature start, Vector2 direction, Creature thrownBy, Weapon? weapon, ref List<Creature> exclude, int remainingChains)
 		{
 			if (remainingChains <= 0) return;
 
@@ -147,7 +164,7 @@ namespace MySlugcat.Ability
 						module.creatureSpasmer.counter = target.stun;
 					}
 				}
-				if (weapon.Submersion <= 0.5f && start.Submersion > 0.5f)
+				if (weapon?.Submersion <= 0.5f && start.Submersion > 0.5f)
 				{
 					room.AddObject(new UnderwaterShock(room, null, start.firstChunk.pos, 10, 800f, 2f, weapon.thrownBy, new Color(0.8f, 0.8f, 1f)));
 				}
@@ -162,7 +179,7 @@ namespace MySlugcat.Ability
 
 				for (int j = 0; j < Mathf.Pow(UnityEngine.Random.value, 4f) * 3; j++)
 				{
-					ArcTriggerChain(weapon, target, thrownBy, direction, ref exclude, remainingChains - 1);
+					ArcTriggerChain(target, direction, thrownBy, weapon, ref exclude, remainingChains - 1);
 				}
 			}
 		}
@@ -181,7 +198,7 @@ namespace MySlugcat.Ability
 			}
 		}
 
-		public static void Recharge(Weapon weapon, Creature start, Creature target, Creature player)
+		public static void Recharge(Weapon? weapon, Creature start, Creature target, Creature player)
 		{
 			Room room = target.room;
 

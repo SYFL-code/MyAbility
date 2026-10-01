@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static MySlugcat.Ability.CrystalShield;
 
 namespace MySlugcat.Ability
 {
-	public static class StalwartScute
+    // 坚韧鳞甲
+    public static class StalwartScute
 	{
 		public sealed class Scute
 		{
@@ -936,5 +936,4 @@ namespace MySlugcat.Ability
 		}
 
 	}
-
 }

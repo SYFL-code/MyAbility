@@ -117,7 +117,7 @@ namespace MySlugcat
 		//public bool TrackingThrowAbility = false;
 		public bool ExtraGraspAbility = false;
 
-		public PlayerModule(Player player):
+		public PlayerModule(Player player) :
 			base(player)
 		{
 			_playerRef = new WeakReference<Player>(player);
@@ -147,8 +147,8 @@ namespace MySlugcat
 		public bool ArcLightningAbility = false;
 		public bool DeflagrationAbility = false;
 		public bool CrystalShieldAbility = false;
-        public bool StalwartScute = false;
-        public bool TrackingThrowAbility = false;
+		public bool StalwartScute = false;
+		public bool TrackingThrowAbility = false;
 
 		public CreatureModule(Creature creature) :
 			base(creature)
@@ -164,16 +164,17 @@ namespace MySlugcat
 						//PenetrationAbility = true;
 						FrameAbility = true;
 						//ArcLightningAbility = true;
-						DeflagrationAbility = true;
-						TrackingThrowAbility = true;
+						//DeflagrationAbility = true;
+						//TrackingThrowAbility = true;
 					}
 				}
 				else
 				{
-				}
-				//CrystalShieldAbility = true;
-				StalwartScute = true;
-            }
+                }
+                //ArcLightningAbility = true;
+                //CrystalShieldAbility = true;
+                StalwartScute = true;
+			}
 		}
 	}
 
