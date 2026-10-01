@@ -220,13 +220,37 @@ public static class Hooks
 				UnHook: () => On.Lizard.SpearStick -= StalwartScute.Lizard_SpearStick
 			);
 			HookManager.Register(
+				Hook: () => On.Scavenger.SpearStick += StalwartScute.Scavenger_SpearStick,
+				UnHook: () => On.Scavenger.SpearStick -= StalwartScute.Scavenger_SpearStick
+			);
+			HookManager.Register(
 				Hook: () => On.Lizard.Violence += StalwartScute.Lizard_Violence,
 				UnHook: () => On.Lizard.Violence -= StalwartScute.Lizard_Violence
+			);
+			HookManager.Register(
+				Hook: () => On.Scavenger.Violence += StalwartScute.Scavenger_Violence,
+				UnHook: () => On.Scavenger.Violence -= StalwartScute.Scavenger_Violence
 			);
 			HookManager.Register(
 				Hook: () => On.Lizard.InitiateGraphicsModule += StalwartScute.Lizard_InitiateGraphicsModule,
 				UnHook: () => On.Lizard.InitiateGraphicsModule -= StalwartScute.Lizard_InitiateGraphicsModule
 			);
+			HookManager.Register(
+				Hook: () => IL.ScavengerGraphics.ctor += StalwartScute.IL_ScavengerGraphics_ctor,
+				UnHook: () => IL.ScavengerGraphics.ctor -= StalwartScute.IL_ScavengerGraphics_ctor
+            );
+			//HookManager.Register(
+			//	Hook: () => On.ScavengerGraphics.InitiateSprites += StalwartScute.ScavengerRenderer.ScavengerGraphics_InitiateSprites,
+			//	UnHook: () => On.ScavengerGraphics.InitiateSprites -= StalwartScute.ScavengerRenderer.ScavengerGraphics_InitiateSprites
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.ScavengerGraphics.DrawSprites += StalwartScute.ScavengerRenderer.ScavengerGraphics_DrawSprites,
+			//	UnHook: () => On.ScavengerGraphics.DrawSprites -= StalwartScute.ScavengerRenderer.ScavengerGraphics_DrawSprites
+			//);
+			//HookManager.Register(
+			//	Hook: () => On.ScavengerGraphics.AddToContainer += StalwartScute.ScavengerRenderer.ScavengerGraphics_AddToContainer,
+			//	UnHook: () => On.ScavengerGraphics.AddToContainer -= StalwartScute.ScavengerRenderer.ScavengerGraphics_AddToContainer
+			//);
 		}
 		#endregion
 
@@ -403,13 +427,27 @@ public static class Hooks
 		}
 		#endregion
 
-		#region UnifiedHookInstaller
+		#region ViolenceHookManager
 		try
 		{
 			HookManager.Register(
-				Hook: () => UnifiedHookInstaller.Install(),
-				UnHook: () => UnifiedHookInstaller.Uninstall()
+				Hook: () => ViolenceHookManager.Apply(),
+				UnHook: () => ViolenceHookManager.Undo()
 			);
+		}
+		catch (Exception ex)
+		{
+			Log.LogError($"Error registering hooks: {ex}");
+		}
+		#endregion
+
+		#region UnifiedHookInstaller
+		try
+		{
+			//HookManager.Register(
+			//	Hook: () => UnifiedHookInstaller.Install(),
+			//	UnHook: () => UnifiedHookInstaller.Uninstall()
+			//);
 		}
 		catch (Exception ex)
 		{

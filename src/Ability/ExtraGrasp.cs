@@ -81,36 +81,27 @@ namespace MySlugcat.Ability
 
 						if (player.grasps[0] != null)
 						{
-							if (player.grasps[0].grabbed is not Spear)
+							for (int i = 2; i < player.grasps.Length; i++)
 							{
-								for (int i = 0; i < player.grasps.Length; i++)
+								if (player.grasps[i] == null)
 								{
-									if (i >= 2)
-									{
-										if (player.grasps[i] == null)
-										{
-											player.grasps[i] = player.grasps[0];
-											player.grasps[0] = null;
-											moved = true;
-											break;
-										}
-									}
+									player.grasps[i] = player.grasps[0];
+									player.grasps[0] = null;
+									moved = true;
+									break;
 								}
 							}
 						}
 						else
 						{
-							for (int i = 0; i < player.grasps.Length; i++)
+							for (int i = 2; i < player.grasps.Length; i++)
 							{
-								if (i >= 2)
+								if (player.grasps[i] != null)
 								{
-									if (player.grasps[i] != null)
-									{
-										player.grasps[0] = player.grasps[i];
-										player.grasps[i] = null;
-										moved = true;
-										break;
-									}
+									player.grasps[0] = player.grasps[i];
+									player.grasps[i] = null;
+									moved = true;
+									break;
 								}
 							}
 						}
@@ -121,7 +112,8 @@ namespace MySlugcat.Ability
 
 							return;
 						}
-						if (player.grasps[0] != null && player.grasps[0].grabbed is not Spear)
+
+						if (player.grasps[0] != null)
 						{
 							if (player.grasps.Length > 2)
 							{
@@ -132,7 +124,7 @@ namespace MySlugcat.Ability
 						}
 						else
 						{
-							if (player.grasps[1] != null && player.grasps[1].grabbed is not Spear)
+							if (player.grasps[1] != null)
 							{
 								if (player.grasps.Length > 2)
 								{
