@@ -170,10 +170,10 @@ namespace MySlugcat
 				}
 				else
 				{
-                }
-                //ArcLightningAbility = true;
-                //CrystalShieldAbility = true;
-                StalwartScute = true;
+				}
+				ArcLightningAbility = true;
+				//CrystalShieldAbility = true;
+				StalwartScute = true;
 			}
 		}
 	}

@@ -118,13 +118,6 @@ namespace MySlugcat.Ability
 				this.pointDepth = pointDepth; this.pointShift = pointShift;
 				this.frillLength = frillLength; this.frillLean = frillLean;
 			}
-			public ScuteData(float center, float width, float pointDepth, float pointShift)
-			{
-				this.center = center;
-				this.width = width;
-				this.pointDepth = pointDepth;
-				this.pointShift = pointShift;
-			}
 
 			public bool IsPresent => this.damageState < 2;
 			public bool IsCracked => this.damageState == 1;
@@ -828,6 +821,14 @@ namespace MySlugcat.Ability
 					sprite.color = this.bandColor;
 				}
 				sprite.alpha = 1f;
+				if (this.lizard.Template.type == CreatureTemplate.Type.WhiteLizard)
+				{
+					var lizardGraphics = lizard.graphicsModule as LizardGraphics;
+					if (lizardGraphics != null)
+					{
+						sprite.color = lizardGraphics.whiteCamoColor;
+					}
+				}
 			}
 
 			private float TopHeight(ScuteData band, float u)

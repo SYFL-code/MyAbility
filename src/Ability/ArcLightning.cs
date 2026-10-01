@@ -78,8 +78,26 @@ namespace MySlugcat.Ability
 						(biteCreature.mainBodyChunk.pos - lizard.mainBodyChunk.pos).normalized;
 
 					List <Creature> exclude = [lizard];
+					if (biteCreature.Module.ArcLightningAbility)
+					{
+						exclude.Add(biteCreature);
+					}
 					// 执行连锁
-					ArcTriggerChain(biteCreature, direction, lizard, null, ref exclude, 4);
+					ArcTriggerChain(biteCreature, direction, lizard, null, ref exclude, 3);
+				}
+			}
+			if (chunk?.owner is Creature hitCreature)
+			{
+				if (hitCreature.Module.ArcLightningAbility)
+				{
+					if (!hitCreature.dead)
+					{
+						if (!lizard.Module.ArcLightningAbility)
+						{
+							// 反击
+							ElectricShock(lizard, hitCreature, hitCreature);
+						}
+					}
 				}
 			}
 
@@ -132,38 +150,11 @@ namespace MySlugcat.Ability
 					remainingChains += 3;
 				}
 
-
-				float stunBonus = (target is not Player) ? (120f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 80f;
 				if (target is not BigEel && !isElectricCreature)
 				{
-					// 施加电击伤害和眩晕
-					target.Violence(thrownBy.firstChunk,
-						Custom.DirVec(start.firstChunk.pos, target.firstChunk.pos) * 5f,
-						target.firstChunk,
-						null,
-						Creature.DamageType.Electric,
-						0.1f,
-						stunBonus);
-
-					//target.Violence(player.firstChunk,
-					//	new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 0.5f),
-					//	target.mainBodyChunk,
-					//	null,
-					//	Creature.DamageType.Electric,
-					//	Damage,
-					//	StunBonus);
-
-					target.GetArcLightningModule(out var module);
-					if (module.creatureSpasmer == null || module.creatureSpasmer.slatedForDeletetion)
-					{
-						module.creatureSpasmer = new CreatureSpasmer(target, true, target.stun);
-						room.AddObject(module.creatureSpasmer);
-					}
-					else
-					{
-						module.creatureSpasmer.counter = target.stun;
-					}
+					ElectricShock(target, start, thrownBy);
 				}
+
 				if (weapon?.Submersion <= 0.5f && start.Submersion > 0.5f)
 				{
 					room.AddObject(new UnderwaterShock(room, null, start.firstChunk.pos, 10, 800f, 2f, weapon.thrownBy, new Color(0.8f, 0.8f, 1f)));
@@ -181,6 +172,39 @@ namespace MySlugcat.Ability
 				{
 					ArcTriggerChain(target, direction, thrownBy, weapon, ref exclude, remainingChains - 1);
 				}
+			}
+		}
+		public static void ElectricShock(Creature target, Creature start, Creature thrownBy)
+		{
+			Room room = target.room;
+
+			float stunBonus = (target is not Player) ? (120f * Mathf.Lerp(target.Template.baseStunResistance, 1f, 0.5f)) : 80f;
+			// 施加电击伤害和眩晕
+			target.Violence(thrownBy.firstChunk,
+				Custom.DirVec(start.firstChunk.pos, target.firstChunk.pos) * 5f,
+				target.firstChunk,
+				null,
+				Creature.DamageType.Electric,
+				0.1f,
+				stunBonus);
+
+			//target.Violence(player.firstChunk,
+			//	new Vector2?(weapon.firstChunk.vel * weapon.firstChunk.mass * 0.5f),
+			//	target.mainBodyChunk,
+			//	null,
+			//	Creature.DamageType.Electric,
+			//	Damage,
+			//	StunBonus);
+
+			target.GetArcLightningModule(out var module);
+			if (module.creatureSpasmer == null || module.creatureSpasmer.slatedForDeletetion)
+			{
+				module.creatureSpasmer = new CreatureSpasmer(target, true, target.stun);
+				room.AddObject(module.creatureSpasmer);
+			}
+			else
+			{
+				module.creatureSpasmer.counter = target.stun;
 			}
 		}
 
@@ -268,50 +292,54 @@ namespace MySlugcat.Ability
 
 			if (creature.GetModule().ArcLightningAbility)
 			{
-				creature.GetArcLightningModule(out var module);
-
-				if (creature.room == null || !creature.Consious)
+				if (creature is Player or Scavenger or Lizard)
 				{
-					module.chargedAuraArcs.Clear();
-					return;
+					creature.GetArcLightningModule(out var module);
+
+					if (creature.room == null || !creature.Consious)
+					{
+						module.chargedAuraArcs.Clear();
+						return;
+					}
+
+					//UpdateChargedAuraPositions(player);
+
+					//module.chargedAuraTimer--;
+					//if (module.chargedAuraTimer <= 0)
+					//{
+					//	SpawnChargedAuraBurst(player);
+					//	module.chargedAuraTimer = UnityEngine.Random.Range(28, 49);
+					//}
+
+
+					if (UnityEngine.Random.value < 0.025f)
+					{
+						//creature.room.AddObject(new ElectricArcCosmetic(creature,
+						//	radius: 35f, life: Random.Range(0.08f, 0.2f), width: Random.Range(1.5f, 3f)));
+						creature.room.AddObject(new ElectricArcCosmetic(creature,
+								radius: Random.Range(20f, 45f),
+								lifeSeconds: Random.Range(0.06f, 0.18f),
+								width: Random.Range(0.03f, 0.08f),
+								hue: 0.6f,
+								chunk: Random.Range(0, creature.bodyChunks.Length)));   // 躯干和臀部随机取锚点
+
+
+						creature.room.PlaySound(SoundID.Death_Lightning_Spark_Spontaneous, creature.mainBodyChunk.pos, 0.32f, UnityEngine.Random.Range(1.05f, 1.35f));
+						//Spark(player);
+					}
+
+					//for (int i = 0; i < player.grasps.Length; i++)
+					//{
+					//	if (player.grasps[i]?.grabbed is Weapon weapon)
+					//	{
+					//		if (UnityEngine.Random.value < 0.025f)
+					//		{
+					//			player.room.AddObject(new WeaponArcField(weapon, 80f));
+					//		}
+					//	}
+					//}
+
 				}
-
-				//UpdateChargedAuraPositions(player);
-
-				//module.chargedAuraTimer--;
-				//if (module.chargedAuraTimer <= 0)
-				//{
-				//	SpawnChargedAuraBurst(player);
-				//	module.chargedAuraTimer = UnityEngine.Random.Range(28, 49);
-				//}
-
-
-				if (UnityEngine.Random.value < 0.025f)
-				{
-					//creature.room.AddObject(new ElectricArcCosmetic(creature,
-					//	radius: 35f, life: Random.Range(0.08f, 0.2f), width: Random.Range(1.5f, 3f)));
-					creature.room.AddObject(new ElectricArcCosmetic(creature,
-							radius: Random.Range(20f, 45f),
-							lifeSeconds: Random.Range(0.06f, 0.18f),
-							width: Random.Range(0.03f, 0.08f),
-							hue: 0.6f,
-							chunk: Random.Range(0, creature.bodyChunks.Length)));   // 躯干和臀部随机取锚点
-
-
-					creature.room.PlaySound(SoundID.Death_Lightning_Spark_Spontaneous, creature.mainBodyChunk.pos, 0.32f, UnityEngine.Random.Range(1.05f, 1.35f));
-					//Spark(player);
-				}
-
-				//for (int i = 0; i < player.grasps.Length; i++)
-				//{
-				//	if (player.grasps[i]?.grabbed is Weapon weapon)
-				//	{
-				//		if (UnityEngine.Random.value < 0.025f)
-				//		{
-				//			player.room.AddObject(new WeaponArcField(weapon, 80f));
-				//		}
-				//	}
-				//}
 			}
 		}
 
