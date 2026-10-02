@@ -13,8 +13,10 @@ using On;
 using RWCustom;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Unity.Mathematics;
@@ -94,12 +96,18 @@ namespace MySlugcat.Ability
 			];
 			public static ScuteData[] ScavengerDefaultScutes =>
 			[
+				new (0.32f, 0.10f, 0.62f, 0.115f, 6.5f, 0.22f),
+				new (0.44f, 0.11f, 0.74f, 0.145f, 9f,   0.24f),
+				new (0.56f, 0.11f, 0.82f, 0.16f,  10f,  0.26f),
+				new (0.68f, 0.10f, 0.72f, 0.16f,  7.5f, 0.28f),
+				new (0.80f, 0.08f, 0.56f, 0.14f,  4.5f, 0.30f),
 			];
 		}
 		extension(Creature creature)
 		{
 			public Scute Scute => ModuleManager.Get(creature, c => new Scute(c));
 		}
+		private static readonly ConditionalWeakTable<ScavengerGraphics, ScavengerBodyBands> ScavengerBands = new();
 
 		public sealed class ScuteData
 		{
@@ -209,6 +217,56 @@ namespace MySlugcat.Ability
 			if (extraStun && self.stun < 20) self.Stun(20);
 		}
 
+		public static void Scavenger_Violence(On.Scavenger.orig_Violence orig, Scavenger self,
+			BodyChunk source, Vector2? dirMomentum, BodyChunk hitChunk,
+			PhysicalObject.Appendage.Pos onAppendagePos, Creature.DamageType type, float damage, float stunBonus)
+		{
+			bool extraStun = false;
+
+			if (self.Module.StalwartScute)
+			{
+				if (type == Creature.DamageType.Explosion)
+				{
+					ScuteHost.BreakNearbyScutesFromExplosion(self, source, hitChunk);
+				}
+
+				var spear = (source?.owner) as Spear;
+				if (spear != null && source?.owner is not ExplosiveSpear
+					&& hitChunk != null && onAppendagePos == null && type == Creature.DamageType.Stab)
+				{
+					var scute = self.Scute;
+
+					bool deflected = spear == scute.LastDeflectSpear && scute.DeflectGrace > 0;
+					int band = -1;
+					if (!deflected && ScuteArmor.TryGetScuteHit(self, spear, hitChunk, out band, out _, out _))
+					{
+						deflected = true;
+						scute.LastDeflectSpear = spear;
+						scute.DeflectGrace = 3;
+						ScuteHost.DamageScuteOnce(self, band, spear);
+						self.room?.PlaySound(SoundID.Lizard_Head_Shield_Deflect, hitChunk);
+					}
+
+					if (deflected)
+					{
+						// 转为钝击：既减伤，也阻止原版插矛逻辑（只认 Stab）
+						type = Creature.DamageType.Blunt;
+						damage *= 0.1f;
+						stunBonus *= 0.4f;
+						if (dirMomentum != null) dirMomentum = dirMomentum.Value * 0.33f;
+					}
+					else
+					{
+						extraStun = true;
+					}
+				}
+			}
+
+			orig(self, source, dirMomentum, hitChunk, onAppendagePos, type, damage, stunBonus);
+
+			if (extraStun && self.stun < 20) self.Stun(20);
+		}
+
 		// 图形
 		public static void Lizard_InitiateGraphicsModule(
 			On.Lizard.orig_InitiateGraphicsModule orig, Lizard self)
@@ -232,6 +290,45 @@ namespace MySlugcat.Ability
 			for (int i = 0; i < g.cosmetics.Count; i++)
 				if (g.cosmetics[i] is BodyBands b) return b;
 			return null;
+		}
+
+		public static void ScavengerGraphics_InitiateSprites(
+			On.ScavengerGraphics.orig_InitiateSprites orig, ScavengerGraphics self,
+			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+		{
+			orig(self, sLeaser, rCam);
+
+			if (!self.scavenger.Module.StalwartScute) return;
+			if (ScavengerBands.TryGetValue(self, out _)) return;
+
+			var bands = new ScavengerBodyBands(self, sLeaser.sprites.Length);
+			bands.InitiateSprites(sLeaser, rCam);   // 内部 Array.Resize 追加 sprite
+			ScavengerBands.Add(self, bands);
+		}
+		public static void ScavengerGraphics_DrawSprites(
+			On.ScavengerGraphics.orig_DrawSprites orig, ScavengerGraphics self,
+			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+		{
+			orig(self, sLeaser, rCam, timeStacker, camPos);
+			if (self.culled) return;
+			if (ScavengerBands.TryGetValue(self, out var bands))
+				bands.DrawSprites(sLeaser, rCam, timeStacker, camPos);
+		}
+		public static void ScavengerGraphics_ApplyPalette(
+			On.ScavengerGraphics.orig_ApplyPalette orig, ScavengerGraphics self,
+			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
+		{
+			orig(self, sLeaser, rCam, palette);
+			if (ScavengerBands.TryGetValue(self, out var bands))
+				bands.ApplyPalette(sLeaser, rCam, palette);
+		}
+		public static void ScavengerGraphics_AddToContainer(
+			On.ScavengerGraphics.orig_AddToContainer orig, ScavengerGraphics self,
+			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, FContainer newContatiner)
+		{
+			orig(self, sLeaser, rCam, newContatiner);
+			if (ScavengerBands.TryGetValue(self, out var bands))
+				bands.AddToContainer(sLeaser);
 		}
 
 
@@ -263,9 +360,9 @@ namespace MySlugcat.Ability
 			}
 
 			// 对鳞甲造成一次伤害
-			public static void DamageScuteOnce(Lizard lizard, int bandIndex, Spear spear)
+			public static void DamageScuteOnce(Creature owner, int bandIndex, Spear spear)
 			{
-				var scute = lizard.Scute;
+				var scute = owner.Scute;
 				if (bandIndex < 0 || bandIndex >= scute.Bands.Length) return;
 
 				var data = scute.Bands[bandIndex];
@@ -275,7 +372,6 @@ namespace MySlugcat.Ability
 					scute.LastDamageBand == bandIndex &&
 					scute.DamageDuplicateGuard > 0) return;
 
-
 				scute.LastDamageSpear = spear;
 				scute.LastDamageBand = bandIndex;
 				scute.DamageDuplicateGuard = 8;
@@ -283,57 +379,46 @@ namespace MySlugcat.Ability
 				int oldState = data.damageState;
 
 				data.WhiteFlicker(18);
-				// 生成鳞甲的视觉效果
-				SpawnVanillaShieldVisuals(lizard.room, lizard.graphicsModule, spear, 18);
+				SpawnVanillaShieldVisuals(owner.room, owner.graphicsModule, spear, 18);
 				data.TakeHit();
 
-				if (oldState == 0 && data.damageState == 1)
-				{
-					/* 裂纹 */
-				}
+				if (oldState == 0 && data.damageState == 1) { /* 裂纹 */ }
 				else if (oldState == 1 && data.damageState >= 2)
 				{
-					lizard.room?.PlaySound(SoundID.Spear_Fragment_Bounce, lizard.mainBodyChunk);
+					owner.room?.PlaySound(SoundID.Spear_Fragment_Bounce, owner.mainBodyChunk);
 				}
 			}
 
 			// 炸碎附近护鳞甲
-			public static void BreakNearbyScutesFromExplosion(Lizard lizard, BodyChunk source, BodyChunk hitChunk)
+			public static void BreakNearbyScutesFromExplosion(Creature owner, BodyChunk source, BodyChunk hitChunk)
 			{
-				var scute = lizard.Scute;
-				var bands = scute.Bands;
+				var bands = owner.Scute.Bands;
 				if (bands.Length == 0) return;
 
+				Vector2 center = source != null ? source.pos
+							   : hitChunk != null ? hitChunk.pos
+							   : owner.mainBodyChunk.pos;
 
-				Vector2 center = Vector2.zero;
-				if (source != null)
-					center = source.pos;
-				else if (hitChunk != null)
-					center = hitChunk.pos;
-				else
-					center = lizard.mainBodyChunk.pos;
 
-				var graphics = lizard.graphicsModule as LizardGraphics;
 				int centerBand = -1;
 				float bestDist = float.MaxValue;
 
-				if (graphics != null)
+				for (int i = 0; i < bands.Length; i++)
 				{
-					for (int i = 0; i < bands.Length; i++)
+					Vector2 pos = default;
+					if (owner.graphicsModule is ScavengerGraphics sg)
 					{
-						// 脊柱位置
-						var spine = graphics.SpinePosition(bands[i].center, 1f);
-						float d = Vector2.Distance(center, spine.pos);
-						if (d < bestDist)
-						{
-							bestDist = d;
-							centerBand = i;
-						}
+						pos = sg.OnSpinePos(Mathf.Clamp01(bands[i].center), 1f);
 					}
-				}
-				if (centerBand < 0)
-					centerBand = bands.Length / 2;
+					else if (owner.graphicsModule is LizardGraphics lg)
+					{
+						pos = lg.SpinePosition(bands[i].center, 1f).pos;
+					}
 
+					float d = Vector2.Distance(center, pos);
+					if (d < bestDist) { bestDist = d; centerBand = i; }
+				}
+				if (centerBand < 0) centerBand = bands.Length / 2;
 
 				int from = Mathf.Max(0, centerBand - 1);
 				int to = Mathf.Min(bands.Length - 1, centerBand + 1);
@@ -457,6 +542,91 @@ namespace MySlugcat.Ability
 					else hitPoint = spear.firstChunk.lastPos;
 
 					float bellyDot = Vector2.Dot(hitPoint - bestSpine.pos, bodyDown) / rad;
+					if (bellyDot <= -0.3f) { hitUnderbelly = true; return false; }
+
+					bandIndex = i;
+					return true;
+				}
+				return false;
+			}
+
+
+			// 命中判定（拾荒者版）：返回 true 表示命中鳞甲
+			public static bool TryGetScuteHit(Scavenger scav, Spear spear, BodyChunk hitChunk,
+				out int bandIndex, out float spineF, out bool hitUnderbelly)
+			{
+				bandIndex = -1; spineF = -1f; hitUnderbelly = false;
+
+				if (scav == null || spear == null || spear.firstChunk == null || hitChunk == null)
+					return false;
+
+				var graphics = scav.graphicsModule as ScavengerGraphics;
+				if (graphics == null) return false;
+
+				var scutes = scav.Scute.Bands;
+				if (scutes == null || scutes.Length == 0) return false;
+
+				Vector2 spearPos = spear.firstChunk.pos;
+				Vector2 dir = spear.firstChunk.vel;
+				if (dir.sqrMagnitude < 0.01f) dir = spear.firstChunk.pos - spear.firstChunk.lastPos;
+				if (dir.sqrMagnitude < 0.01f) dir = hitChunk.pos - spearPos;
+				if (dir.sqrMagnitude < 0.0001f) return false;
+
+				Vector2 forward = dir.normalized;
+				Vector2 side = new Vector2(-forward.y, forward.x);
+
+				float best = float.MaxValue;
+				float bestF = -1f;
+				Vector2 bestSpinePos = default;
+				float maxDist = hitChunk.rad + 30f;
+
+				for (int i = 0; i <= 160; i++)
+				{
+					float f = (float)i / 160f;
+					var sp = graphics.OnSpinePos(f, 1f);
+					var spinePos = new Vector2(sp.x, sp.y);
+					float d = Vector2.Distance(spinePos, hitChunk.pos);
+					if (d > maxDist) continue;
+
+					Vector2 delta = spinePos - spearPos;
+					float score = Mathf.Abs(Vector2.Dot(delta, side))
+								+ (Mathf.Abs(Vector2.Dot(delta, forward)) * 0.015f)
+								+ (d * 0.002f);
+					if (score < best) { best = score; bestF = f; bestSpinePos = spinePos; }
+				}
+
+				if (bestF < 0f) return false;
+				spineF = bestF;
+
+				for (int i = 0; i < scutes.Length; i++)
+				{
+					var scute = scutes[i];
+					if (!scute.IsPresent) continue;
+
+					float halfWidth = scute.width * 0.5f;
+					if (bestF < scute.center - halfWidth || bestF > scute.center + halfWidth)
+						continue;
+
+					var up2 = graphics.OnSpineUpDir(bestF, 1f);
+					Vector2 bodyDown = -new Vector2(up2.x, up2.y);
+					if (bodyDown.sqrMagnitude < 0.0001f) bodyDown = Vector2.down;
+					bodyDown.Normalize();
+
+					float rad = Mathf.Max(1f, graphics.OnSpineWidth(bestF, 1f) * 0.5f);
+
+					Vector2 toSpine = bestSpinePos - spearPos;
+					float along = Vector2.Dot(toSpine, forward);
+					float perpSq = Mathf.Max(0f, toSpine.sqrMagnitude - (along * along));
+
+					Vector2 hitPoint;
+					if (perpSq <= rad * rad)
+					{
+						float off = Mathf.Sqrt((rad * rad) - perpSq);
+						hitPoint = spearPos + (forward * (along - off));
+					}
+					else hitPoint = spear.firstChunk.lastPos;
+
+					float bellyDot = Vector2.Dot(hitPoint - bestSpinePos, bodyDown) / rad;
 					if (bellyDot <= -0.3f) { hitUnderbelly = true; return false; }
 
 					bandIndex = i;
@@ -990,6 +1160,342 @@ namespace MySlugcat.Ability
 
 			private readonly int[] fragmentLife;
 		}
+		public sealed class ScavengerBodyBands
+		{
+			public int BandCount => this.scutes.Length;
+			public int TotalSprites => this.BandCount * 7;
+
+			private readonly ScavengerGraphics sGraphics;
+			private readonly Scavenger scavenger;
+			private readonly ScuteData[] scutes;
+			private readonly int firstSprite;
+
+			public ScavengerBodyBands(ScavengerGraphics sGraphics, int firstSprite)
+			{
+				this.sGraphics = sGraphics;
+				this.scavenger = sGraphics.scavenger;
+				this.scutes = this.scavenger.Scute.Bands;
+				this.firstSprite = firstSprite;
+
+				this.bandColor = Color.white;
+				this.fragmentActive = new bool[this.BandCount];
+				this.fragmentPos = new Vector2[this.BandCount];
+				this.fragmentLastPos = new Vector2[this.BandCount];
+				this.fragmentVel = new Vector2[this.BandCount];
+				this.fragmentRotation = new float[this.BandCount];
+				this.fragmentRotVel = new float[this.BandCount];
+				this.fragmentLife = new int[this.BandCount];
+			}
+
+			private ScuteData GetBand(int index)
+				=> this.scutes[Mathf.Clamp(index, 0, this.scutes.Length - 1)];
+
+			private int BandSprite(int i) => this.firstSprite + (i * 7);
+			private int CrackSprite(int i, int seg) => this.BandSprite(i) + 1 + seg;
+			private int FragmentSprite(int i) => this.BandSprite(i) + 6;
+
+			// ---------- 脊柱采样（拾荒者版核心：三个方法拼出 LizardSpineData 等价物） ----------
+			private Vector2 SpinePos(float f, float timeStacker)
+			{
+				var p = this.sGraphics.OnSpinePos(Mathf.Clamp01(f), timeStacker);
+				return new Vector2(p.x, p.y);
+			}
+
+			private Vector2 BodyUp(float f, float timeStacker)
+			{
+				var u = this.sGraphics.OnSpineUpDir(Mathf.Clamp01(f), timeStacker);
+				var up = new Vector2(u.x, u.y);
+				return up.sqrMagnitude > 0.0001f ? up.normalized : Vector2.up;
+			}
+
+			private float SpineRad(float f, float timeStacker)
+				=> Mathf.Max(1f, this.sGraphics.OnSpineWidth(Mathf.Clamp01(f), timeStacker) * 0.5f);
+
+			private Vector2 SpineDir(float f, float timeStacker)
+			{
+				var d = this.sGraphics.OnSpineDir(Mathf.Clamp01(f), timeStacker);
+				var dir = new Vector2(d.x, d.y);
+				return dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.left;
+			}
+
+			internal float GetBandS(int bandIndex, float u)
+			{
+				ScuteData band = this.GetBand(bandIndex);
+				return Mathf.Clamp01(band.center + (Mathf.Clamp(u, -1f, 1f) * band.width * 0.5f));
+			}
+
+			// ---------- 生命周期 ----------
+			public void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+			{
+				if (sLeaser.sprites.Length < this.firstSprite + this.TotalSprites)
+					Array.Resize(ref sLeaser.sprites, this.firstSprite + this.TotalSprites);
+
+				for (int i = 0; i < this.BandCount; i++)
+				{
+					TriangleMesh.Triangle[] tris = new TriangleMesh.Triangle[24];
+					for (int j = 0; j < 12; j++)
+					{
+						int n = j * 2;
+						tris[j * 2] = new TriangleMesh.Triangle(n, n + 1, n + 2);
+						tris[(j * 2) + 1] = new TriangleMesh.Triangle(n + 1, n + 3, n + 2);
+					}
+					sLeaser.sprites[this.BandSprite(i)] = new TriangleMesh("Futile_White", tris, false, false)
+					{ color = this.bandColor };
+
+					for (int k = 0; k < 5; k++)
+					{
+						sLeaser.sprites[this.CrackSprite(i, k)] = new FSprite("pixel", true)
+						{ anchorX = 0f, anchorY = 0.5f, scaleY = 1f, color = this.crackColor, isVisible = false };
+					}
+					sLeaser.sprites[this.FragmentSprite(i)] = new FSprite("Circle20", true)
+					{ color = this.bandColor, scaleX = 0.42f, scaleY = 0.16f, isVisible = false };
+				}
+			}
+
+			public void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
+			{
+				// 用拾荒者自己的体色/头色混合出甲片色，已含 darkness 处理
+				this.bandColor = Color.Lerp(
+					Color.Lerp(this.sGraphics.BlendedBodyColor, this.sGraphics.BlendedHeadColor, 0.45f),
+					palette.blackColor, 0.06f);
+				this.crackColor = palette.blackColor;
+
+				for (int i = 0; i < this.BandCount; i++)
+				{
+					if (sLeaser.sprites[this.BandSprite(i)] != null)
+						sLeaser.sprites[this.BandSprite(i)].color = this.bandColor;
+					for (int j = 0; j < 5; j++)
+						if (sLeaser.sprites[this.CrackSprite(i, j)] != null)
+							sLeaser.sprites[this.CrackSprite(i, j)].color = this.crackColor;
+					if (sLeaser.sprites[this.FragmentSprite(i)] != null)
+						sLeaser.sprites[this.FragmentSprite(i)].color = this.bandColor;
+				}
+			}
+
+			public void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+			{
+				if (UnityEngine.Random.value > 0.025f)
+					this.everySecondDraw = !this.everySecondDraw;
+
+				for (int i = 0; i < this.BandCount; i++)
+				{
+					ScuteData band = this.GetBand(i);
+					if (sLeaser.sprites[this.BandSprite(i)] is not TriangleMesh mesh) continue;
+					var fragment = sLeaser.sprites[this.FragmentSprite(i)];
+
+					if (band.IsPresent)
+					{
+						this.DrawBandMesh(mesh, i, band, timeStacker, camPos);
+						this.ApplyScuteWhiteFlicker(mesh, band);
+						mesh.isVisible = true;
+
+						if (band.IsCracked) this.DrawCrack(sLeaser, i, band, timeStacker, camPos);
+						else this.HideCracks(sLeaser, i);
+
+						if (fragment != null) fragment.isVisible = false;
+					}
+					else
+					{
+						mesh.isVisible = false;
+						this.HideCracks(sLeaser, i);
+
+						if (!band.brokenFragmentSpawned)
+						{
+							this.StartFallingFragment(i, band, timeStacker);
+							band.brokenFragmentSpawned = true;
+						}
+						this.UpdateAndDrawFragment(fragment, i, timeStacker, camPos);
+					}
+				}
+			}
+
+			// 入层：塞进 containers[1]（前肢之后、头/颈/牙之前），并防重复
+			public void AddToContainer(RoomCamera.SpriteLeaser sLeaser)
+			{
+				if (this.TotalSprites == 0 || sLeaser.sprites[this.firstSprite] == null) return;
+				if (sLeaser.sprites[this.firstSprite].container != null) return;
+				for (int i = 0; i < this.TotalSprites; i++)
+					sLeaser.containers[1].AddChild(sLeaser.sprites[this.firstSprite + i]);
+			}
+
+			// ---------- 网格/裂纹/碎片（几何与蜥蜴版相同，只换脊柱采样） ----------
+			private void DrawBandMesh(TriangleMesh mesh, int bandIndex, ScuteData band, float timeStacker, Vector2 camPos)
+			{
+				for (int i = 0; i < 13; i++)
+				{
+					float u = Mathf.Lerp(-1f, 1f, i / 12f);
+					float f = this.GetBandS(bandIndex, u);
+					Vector2 spinePos = this.SpinePos(f, timeStacker);
+					Vector2 up = this.BodyUp(f, timeStacker);
+					float rad = this.SpineRad(f, timeStacker);
+
+					Vector2 top = spinePos + (up * (rad * this.TopHeight(band, u)));
+					Vector2 bottom = spinePos + (up * (rad * this.BottomHeight(band, u)));
+					int n = i * 2;
+					mesh.MoveVertice(n, top - camPos);
+					mesh.MoveVertice(n + 1, bottom - camPos);
+				}
+			}
+
+			private void DrawCrack(RoomCamera.SpriteLeaser sLeaser, int bandIndex, ScuteData band, float timeStacker, Vector2 camPos)
+			{
+				float sign = (bandIndex % 2 == 0) ? 1f : -1f;
+				float jitter = (float)((bandIndex * 37 % 5) - 2) * 0.018f;
+				Vector2 p0 = this.GetPointInsideBand(bandIndex, -0.3f * sign, 0.18f, timeStacker);
+				Vector2 p1 = this.GetPointInsideBand(bandIndex, (-0.08f + jitter) * sign, 0.43f, timeStacker);
+				Vector2 p2 = this.GetPointInsideBand(bandIndex, (0.07f - jitter) * sign, 0.52f, timeStacker);
+				Vector2 p3 = this.GetPointInsideBand(bandIndex, 0.3f * sign, 0.82f, timeStacker);
+				Vector2 p4 = this.GetPointInsideBand(bandIndex, -0.34f * sign, 0.62f, timeStacker);
+				Vector2 p5 = this.GetPointInsideBand(bandIndex, 0.34f * sign, 0.35f, timeStacker);
+				this.DrawCrackSegment(sLeaser.sprites[this.CrackSprite(bandIndex, 0)], p0, p1, camPos, 1.1f);
+				this.DrawCrackSegment(sLeaser.sprites[this.CrackSprite(bandIndex, 1)], p1, p2, camPos, 0.95f);
+				this.DrawCrackSegment(sLeaser.sprites[this.CrackSprite(bandIndex, 2)], p2, p3, camPos, 1.05f);
+				this.DrawCrackSegment(sLeaser.sprites[this.CrackSprite(bandIndex, 3)], p1, p4, camPos, 0.8f);
+				this.DrawCrackSegment(sLeaser.sprites[this.CrackSprite(bandIndex, 4)], p2, p5, camPos, 0.72f);
+			}
+
+			private void DrawCrackSegment(FSprite crack, Vector2 from, Vector2 to, Vector2 camPos, float thickness)
+			{
+				if (crack == null) return;
+				Vector2 v = to - from;
+				crack.x = from.x - camPos.x;
+				crack.y = from.y - camPos.y;
+				crack.scaleX = v.magnitude;
+				crack.scaleY = thickness;
+				crack.rotation = -Mathf.Atan2(v.y, v.x) * 57.29578f;
+				crack.color = this.crackColor;
+				crack.alpha = 1f;
+				crack.isVisible = true;
+			}
+
+			private void HideCracks(RoomCamera.SpriteLeaser sLeaser, int bandIndex)
+			{
+				for (int i = 0; i < 5; i++)
+					if (sLeaser.sprites[this.CrackSprite(bandIndex, i)] is FSprite c)
+						c.isVisible = false;
+			}
+
+			private Vector2 GetPointInsideBand(int bandIndex, float u, float depth, float timeStacker)
+			{
+				ScuteData band = this.GetBand(bandIndex);
+				u = Mathf.Clamp(u, -0.9f, 0.9f);
+				depth = Mathf.Clamp01(depth);
+				float f = this.GetBandS(bandIndex, u);
+				float h = Mathf.Lerp(this.TopHeight(band, u), this.BottomHeight(band, u),
+									 Mathf.Lerp(0.08f, 0.92f, depth));
+				return this.SpinePos(f, timeStacker) + (this.BodyUp(f, timeStacker) * (this.SpineRad(f, timeStacker) * h));
+			}
+
+			private void StartFallingFragment(int bandIndex, ScuteData band, float timeStacker)
+			{
+				float f = band.center;
+				Vector2 pos = this.SpinePos(f, timeStacker)
+							+ (this.BodyUp(f, timeStacker) * (this.SpineRad(f, timeStacker) * 0.65f));
+				this.fragmentPos[bandIndex] = pos;
+				this.fragmentLastPos[bandIndex] = pos;
+				this.fragmentVel[bandIndex] = (this.BodyUp(f, timeStacker) * 2.5f)
+					+ (this.SpineDir(f, timeStacker) * UnityEngine.Random.Range(-2.5f, 2.5f))
+					+ new Vector2(0f, 1.5f);
+				this.fragmentRotation[bandIndex] = UnityEngine.Random.Range(0f, 360f);
+				this.fragmentRotVel[bandIndex] = UnityEngine.Random.Range(-18f, 18f);
+				this.fragmentLife[bandIndex] = 70;
+				this.fragmentActive[bandIndex] = true;
+			}
+
+			private void UpdateAndDrawFragment(FSprite fragment, int bandIndex, float timeStacker, Vector2 camPos)
+			{
+				if (fragment == null) return;
+				if (!this.fragmentActive[bandIndex] || this.fragmentLife[bandIndex] <= 0)
+				{
+					fragment.isVisible = false;
+					return;
+				}
+
+				this.fragmentLastPos[bandIndex] = this.fragmentPos[bandIndex];
+				this.fragmentVel[bandIndex].y -= 0.35f;
+				this.fragmentPos[bandIndex] += this.fragmentVel[bandIndex];
+				this.fragmentRotation[bandIndex] += this.fragmentRotVel[bandIndex];
+				this.fragmentLife[bandIndex]--;
+
+				var room = this.scavenger.room;
+				if (room != null)
+				{
+					var tilePos = room.GetTilePosition(this.fragmentPos[bandIndex]);
+					if (room.IsPositionInsideBoundries(tilePos) && room.GetTile(tilePos).Solid)
+					{
+						this.fragmentVel[bandIndex].y = Mathf.Abs(this.fragmentVel[bandIndex].y) * 0.35f;
+						this.fragmentVel[bandIndex].x *= 0.65f;
+						this.fragmentPos[bandIndex].y += 2f;
+					}
+				}
+
+				Vector2 drawPos = Vector2.Lerp(this.fragmentLastPos[bandIndex], this.fragmentPos[bandIndex], timeStacker);
+				fragment.x = drawPos.x - camPos.x;
+				fragment.y = drawPos.y - camPos.y;
+				fragment.rotation = this.fragmentRotation[bandIndex];
+				fragment.scaleX = 0.42f;
+				fragment.scaleY = 0.16f;
+				this.ApplyScuteWhiteFlicker(fragment, this.GetBand(bandIndex));
+				fragment.alpha *= Mathf.InverseLerp(0f, 20f, this.fragmentLife[bandIndex]);
+				fragment.isVisible = true;
+
+				if (this.fragmentLife[bandIndex] <= 0)
+				{
+					this.fragmentActive[bandIndex] = false;
+					fragment.isVisible = false;
+				}
+			}
+
+			private void ApplyScuteWhiteFlicker(FSprite sprite, ScuteData band)
+			{
+				if (band.whiteFlicker > 0 && (band.whiteFlicker > 15 || this.everySecondDraw))
+					sprite.color = Color.white;
+				else
+					sprite.color = this.bandColor;
+				sprite.alpha = 1f;
+			}
+
+			// 形状函数与蜥蜴版保持一致
+			private float TopHeight(ScuteData band, float u)
+			{
+				float edge = Mathf.InverseLerp(0.76f, 1f, Mathf.Abs(u));
+				edge = edge * edge * (3f - (2f * edge));
+				return Mathf.Lerp(0.98f, 0.84f, edge)
+					 + (Mathf.Lerp(0.05f, 0.16f, this.WrapCenterProfile(u)) * this.FrontWrapBoost(band));
+			}
+
+			private float BottomHeight(ScuteData band, float u)
+			{
+				float num = 1f - Mathf.Clamp01(Mathf.Abs(Mathf.Clamp(u - band.pointShift, -1f, 1f)));
+				num = num * num * (3f - (2f * num));
+				float depth = Mathf.InverseLerp(0.28f, 0.52f, band.pointDepth);
+				return Mathf.Lerp(Mathf.Lerp(0.54f, 0.38f, depth), Mathf.Lerp(0.24f, 0.06f, depth), num);
+			}
+
+			private float WrapCenterProfile(float u)
+			{
+				float num = 1f - Mathf.InverseLerp(0.45f, 1f, Mathf.Abs(u));
+				return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(num));
+			}
+
+			private float FrontWrapBoost(ScuteData band)
+			{
+				float num = 1f - Mathf.InverseLerp(0.12f, 0.32f, band.center);
+				return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(num));
+			}
+
+			private Color bandColor;
+			private Color crackColor = Color.black;
+			private bool everySecondDraw;
+			private readonly bool[] fragmentActive;
+			private readonly Vector2[] fragmentPos;
+			private readonly Vector2[] fragmentLastPos;
+			private readonly Vector2[] fragmentVel;
+			private readonly float[] fragmentRotation;
+			private readonly float[] fragmentRotVel;
+			private readonly int[] fragmentLife;
+		}
+
 
 	}
 }

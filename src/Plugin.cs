@@ -64,10 +64,6 @@ public sealed class Plugin : BaseUnityPlugin
 #endif
 	#endregion
 
-
-	private bool isEnabled;
-	public bool inited;
-
 	#region Unity
 
 	public void Awake()// Awake → OnEnable → Start
@@ -92,6 +88,11 @@ public sealed class Plugin : BaseUnityPlugin
 
 	#endregion
 
+	// 跨 DLL 实例共享的全局键
+	private const string OWNER_KEY = $"{GUID}.ActiveOwner";
+	private bool isEnabled;
+	public bool inited;
+
 	public void OnEnable()
 	{
 		Log.LogDebug($"{Name} Mod OnEnable! isEnabled: {isEnabled}");
@@ -99,6 +100,19 @@ public sealed class Plugin : BaseUnityPlugin
 		if (this.isEnabled)
 			return;
 		this.isEnabled = true;
+
+		var owner = AppDomain.CurrentDomain.GetData(OWNER_KEY);
+		if (owner != null && owner is BaseUnityPlugin)
+		{
+			Log.LogWarning($"检测到重复加载，已有实例活跃，主动销毁自己");
+			isEnabled = false;
+			Destroy(this);
+			return;
+		}
+		AppDomain.CurrentDomain.SetData(OWNER_KEY, this);
+		Log.LogInfo("成为活跃实例，开始注册钩子");
+
+
 
 		CommonUtils.Plugin.plugin.OnEnable();
 
@@ -122,6 +136,15 @@ public sealed class Plugin : BaseUnityPlugin
 		if (!this.isEnabled)
 			return;
 		this.isEnabled = false;
+
+		var owner = AppDomain.CurrentDomain.GetData(OWNER_KEY);
+		if (owner is BaseUnityPlugin baseUnityPlugin && baseUnityPlugin == this)
+		{
+			Log.LogInfo("活跃实例被卸载，清除所有权");
+			AppDomain.CurrentDomain.SetData(OWNER_KEY, null);
+		}
+
+
 
 		CommonUtils.Plugin.plugin.OnDisable();
 

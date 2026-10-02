@@ -22,11 +22,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using UnityEngine;
 using Watcher;
-using static CommonUtils.Core.UnifiedHookInstaller;
-using static MySlugcat.Ability.Camouflage;
-using static PhysicalObject;
-using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
-using static UnityEngine.UI.Image;
+using static CommonUtils.Core.UnifiedHooks;
 
 namespace MySlugcat.Ability
 {
@@ -114,58 +110,41 @@ namespace MySlugcat.Ability
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
 
-		public class DamageReductionHandler : IViolenceHandler
+		public static void Violence(orig_Violence orig, Creature creature, BodyChunk source, Vector2? directionAndMomentum,
+			BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage,
+			Creature.DamageType type, float damage, float stunBonus)
 		{
-			public bool OnPrefix(Creature self, ref BodyChunk source, ref Vector2? directionAndMomentum,
-								  ref BodyChunk hitChunk, ref PhysicalObject.Appendage.Pos hitAppendage,
-								  ref Creature.DamageType type, ref float damage, ref float stunBonus)
+			//Log.LogVar(creature, source);
+			//Log.LogVar(directionAndMomentum, hitChunk, hitAppendage);
+			//Log.LogVar(type, damage, stunBonus);
+			if (creature.Module.CrystalShieldAbility && creature.Shield.validity)
 			{
-				Log.LogDebug("");
-
-				Log.LogVar(self, source);
-				Log.LogVar(directionAndMomentum, hitChunk, hitAppendage);
-				Log.LogVar(type, damage, stunBonus);
-				if (self.Module.CrystalShieldAbility && self.Shield.validity)
+				if (type == Creature.DamageType.Explosion)
 				{
-					if (type == Creature.DamageType.Explosion)
+					Log.LogVar(creature.Shield.damage);
+
+					// 爆炸伤害转移到盾的耐久上
+					AddDamage(creature, damage);
+					damage = 0f;
+
+					Log.LogVar(creature.Shield.damage);
+
+					// 保留部分击退，让玩家能感受到爆炸的推力
+					if (directionAndMomentum.HasValue)
 					{
-						//damage *= 0.5f;  // 减伤 50%
-
-						Log.LogVar(self.Shield.damage);
-
-						// 爆炸伤害转移到盾的耐久上
-						//damage = Mathf.Max(damage - Mathf.Max(1f - self.Shield.damage, 0f), 0f);
-						AddDamage(self, damage);
-						damage = 0f;
-
-						Log.LogVar(self.Shield.damage);
-
-						// 保留部分击退，让玩家能感受到爆炸的推力
-						if (directionAndMomentum.HasValue)
-						{
-							directionAndMomentum *= 0.2f;
-						}
-						for (int i = 0; i < self.bodyChunks.Length; i++)
-						{
-							self.bodyChunks[i].vel *= 0.2f;
-						}
-
-						// 可选：保留部分眩晕
-						stunBonus *= 0.3f;
-						//stunBonus = Mathf.Min(stunBonus, 30f);
-
-						self.stun = 0;
+						directionAndMomentum *= 0.2f;
 					}
-				}
-				Log.LogDebug("");
+					for (int i = 0; i < creature.bodyChunks.Length; i++)
+					{
+						creature.bodyChunks[i].vel *= 0.2f;
+					}
 
-				return true;
+					// 可选：保留部分眩晕
+					stunBonus *= 0.3f;
+				}
 			}
 
-			public void OnPostfix(Creature self, BodyChunk source, Vector2? dir,
-								   BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage,
-								   Creature.DamageType type, float damage, float stunBonus)
-			{ }
+			orig(creature, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
 		}
 
 		public static void Creature_Update(On.Creature.orig_Update orig, Creature creature, bool eu)

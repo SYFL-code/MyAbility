@@ -150,7 +150,7 @@ namespace MySlugcat.Ability
 					remainingChains += 3;
 				}
 
-				if (target is not BigEel && !isElectricCreature)
+				if (target is not BigEel && !isElectricCreature && !target.Module.ArcLightningAbility)
 				{
 					ElectricShock(target, start, thrownBy);
 				}

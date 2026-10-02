@@ -300,14 +300,19 @@ namespace MySlugcat.Ability
 			player.GetModule(out var module);
 			if (module.ExtraGraspAbility)
 			{
-				if (player.grasps[0] != null && player.grasps[1] != null)
-				{
-					if (player.Grabability(obj) > Player.ObjectGrabability.OneHand)
-					{
-						return false;
-					}
-				}
-			}
+                //if (player.grasps[0] != null && player.grasps[1] != null)
+                //{
+                //	if (player.Grabability(obj) > Player.ObjectGrabability.OneHand)
+                //	{
+                //		return false;
+                //	}
+                //}
+                if (player.Grabability(obj) == Player.ObjectGrabability.CantGrab)
+                {
+                    return false;
+                }
+                return true;
+            }
 
 			return orig(player, obj);
 		}

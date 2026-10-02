@@ -29,6 +29,7 @@ using System.Windows.Forms;
 using UnityEngine;
 using Watcher;
 using static CommonUtils.Core.HookManager;
+using static CommonUtils.Core.UnifiedHooks;
 using static PhysicalObject;
 namespace MySlugcat;
 
@@ -227,10 +228,10 @@ public static class Hooks
 				Hook: () => On.Lizard.Violence += StalwartScute.Lizard_Violence,
 				UnHook: () => On.Lizard.Violence -= StalwartScute.Lizard_Violence
 			);
-			//HookManager.Register(
-			//	Hook: () => On.Scavenger.Violence += StalwartScute.Scavenger_Violence,
-			//	UnHook: () => On.Scavenger.Violence -= StalwartScute.Scavenger_Violence
-			//);
+			HookManager.Register(
+				Hook: () => On.Scavenger.Violence += StalwartScute.Scavenger_Violence,
+				UnHook: () => On.Scavenger.Violence -= StalwartScute.Scavenger_Violence
+			);
 			HookManager.Register(
 				Hook: () => On.Lizard.InitiateGraphicsModule += StalwartScute.Lizard_InitiateGraphicsModule,
 				UnHook: () => On.Lizard.InitiateGraphicsModule -= StalwartScute.Lizard_InitiateGraphicsModule
@@ -239,18 +240,22 @@ public static class Hooks
 			//	Hook: () => IL.ScavengerGraphics.ctor += StalwartScute.IL_ScavengerGraphics_ctor,
 			//	UnHook: () => IL.ScavengerGraphics.ctor -= StalwartScute.IL_ScavengerGraphics_ctor
 			//);
-			//HookManager.Register(
-			//	Hook: () => On.ScavengerGraphics.InitiateSprites += StalwartScute.ScavengerRenderer.ScavengerGraphics_InitiateSprites,
-			//	UnHook: () => On.ScavengerGraphics.InitiateSprites -= StalwartScute.ScavengerRenderer.ScavengerGraphics_InitiateSprites
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.ScavengerGraphics.DrawSprites += StalwartScute.ScavengerRenderer.ScavengerGraphics_DrawSprites,
-			//	UnHook: () => On.ScavengerGraphics.DrawSprites -= StalwartScute.ScavengerRenderer.ScavengerGraphics_DrawSprites
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.ScavengerGraphics.AddToContainer += StalwartScute.ScavengerRenderer.ScavengerGraphics_AddToContainer,
-			//	UnHook: () => On.ScavengerGraphics.AddToContainer -= StalwartScute.ScavengerRenderer.ScavengerGraphics_AddToContainer
-			//);
+			HookManager.Register(
+				Hook: () => On.ScavengerGraphics.InitiateSprites += StalwartScute.ScavengerGraphics_InitiateSprites,
+				UnHook: () => On.ScavengerGraphics.InitiateSprites -= StalwartScute.ScavengerGraphics_InitiateSprites
+			);
+			HookManager.Register(
+				Hook: () => On.ScavengerGraphics.DrawSprites += StalwartScute.ScavengerGraphics_DrawSprites,
+				UnHook: () => On.ScavengerGraphics.DrawSprites -= StalwartScute.ScavengerGraphics_DrawSprites
+			);
+			HookManager.Register(
+				Hook: () => On.ScavengerGraphics.ApplyPalette += StalwartScute.ScavengerGraphics_ApplyPalette,
+				UnHook: () => On.ScavengerGraphics.ApplyPalette -= StalwartScute.ScavengerGraphics_ApplyPalette
+			);
+			HookManager.Register(
+				Hook: () => On.ScavengerGraphics.AddToContainer += StalwartScute.ScavengerGraphics_AddToContainer,
+				UnHook: () => On.ScavengerGraphics.AddToContainer -= StalwartScute.ScavengerGraphics_AddToContainer
+			);
 		}
 		#endregion
 
@@ -265,8 +270,8 @@ public static class Hooks
 				UnHook: () => HitSomething -= CrystalShield.CrystalShield_HitSomething
 			);
 			HookManager.Register(
-				Hook: () => UnifiedHookInstaller.Register(new CrystalShield.DamageReductionHandler()),
-				UnHook: () => UnifiedHookInstaller.Unregister(new CrystalShield.DamageReductionHandler())
+				Hook: () => UnifiedSubscribe.Violence += CrystalShield.Violence,
+				UnHook: () => UnifiedSubscribe.Violence -= CrystalShield.Violence
 			);
 		}
 		#endregion
@@ -427,34 +432,6 @@ public static class Hooks
 		}
 		#endregion
 
-		#region ViolenceHookManager
-		try
-		{
-			HookManager.Register(
-				Hook: () => ViolenceHookManager.Apply(),
-				UnHook: () => ViolenceHookManager.Undo()
-			);
-		}
-		catch (Exception ex)
-		{
-			Log.LogError($"Error registering hooks: {ex}");
-		}
-		#endregion
-
-		#region UnifiedHookInstaller
-		try
-		{
-			//HookManager.Register(
-			//	Hook: () => UnifiedHookInstaller.Install(),
-			//	UnHook: () => UnifiedHookInstaller.Uninstall()
-			//);
-		}
-		catch (Exception ex)
-		{
-			Log.LogError($"Error registering hooks: {ex}");
-		}
-		#endregion
-
 
 		try
 		{
@@ -538,7 +515,11 @@ public static class Hooks
 		where O : Delegate
 		where W : Weapon
 	{
-		if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
+		if (orig_ is UnifiedHooks.orig_HitSomething orig_HitSomething)
+		{
+			return orig_HitSomething.Invoke;
+		}
+		else if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
 		{
 			return weapon_orig.Invoke;
 		}
