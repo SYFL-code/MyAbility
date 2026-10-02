@@ -93,8 +93,8 @@ public static class Hooks
 				UnHook: () => On.Weapon.Thrown -= ModuleHooks.Weapon_Thrown
 			);
 			HookManager.Register(
-				Hook: () => HitSomething += ModuleHooks.Weapon_HitSomething,
-				UnHook: () => HitSomething -= ModuleHooks.Weapon_HitSomething
+				Hook: () => UnifiedSubscribe.HitSomething += ModuleHooks.Weapon_HitSomething,
+				UnHook: () => UnifiedSubscribe.HitSomething -= ModuleHooks.Weapon_HitSomething
 			);
 		}
 		#endregion
@@ -174,39 +174,9 @@ public static class Hooks
 		{
 			// HitSomething
 			HookManager.Register(
-				Hook: () => HitSomething += Frame.Frame_HitSomething,
-				UnHook: () => HitSomething -= Frame.Frame_HitSomething
+				Hook: () => UnifiedSubscribe.HitSomething += Frame.Frame_HitSomething,
+				UnHook: () => UnifiedSubscribe.HitSomething -= Frame.Frame_HitSomething
 			);
-			//HookManager.Register(
-			//	Hook: () => On.Weapon.HitSomething += Frame.Frame_HitSomething,
-			//	UnHook: () => On.Weapon.HitSomething -= Frame.Frame_HitSomething
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.Spear.HitSomething += Frame.Frame_HitSomething,
-			//	UnHook: () => On.Spear.HitSomething -= Frame.Frame_HitSomething
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.Rock.HitSomething += Frame.Frame_HitSomething,
-			//	UnHook: () => On.Rock.HitSomething -= Frame.Frame_HitSomething
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.ScavengerBomb.HitSomething += Frame.Frame_HitSomething,
-			//	UnHook: () => On.ScavengerBomb.HitSomething -= Frame.Frame_HitSomething
-			//);
-			//if (ModManager.MSC)
-			//{
-			//	HookManager.Register(
-			//		Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Frame.Frame_HitSomething,
-			//		UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Frame.Frame_HitSomething
-			//	);
-			//}
-			//if (ModManager.Watcher)
-			//{
-			//	HookManager.Register(
-			//		Hook: () => On.Boomerang.HitSomething += Frame.Frame_HitSomething,
-			//		UnHook: () => On.Boomerang.HitSomething -= Frame.Frame_HitSomething
-			//	);
-			//}
 		}
 		#endregion
 
@@ -266,8 +236,8 @@ public static class Hooks
 				UnHook: () => On.Creature.Update -= CrystalShield.Creature_Update
 			);
 			HookManager.Register(
-				Hook: () => HitSomething += CrystalShield.CrystalShield_HitSomething,
-				UnHook: () => HitSomething -= CrystalShield.CrystalShield_HitSomething
+				Hook: () => UnifiedSubscribe.HitSomething += CrystalShield.CrystalShield_HitSomething,
+				UnHook: () => UnifiedSubscribe.HitSomething -= CrystalShield.CrystalShield_HitSomething
 			);
 			HookManager.Register(
 				Hook: () => UnifiedSubscribe.Violence += CrystalShield.Violence,
@@ -290,8 +260,8 @@ public static class Hooks
 		{
 			// HitSomething
 			HookManager.Register(
-				Hook: () => HitSomething += Penetration.PenetrateHit,
-				UnHook: () => HitSomething -= Penetration.PenetrateHit
+				Hook: () => UnifiedSubscribe.HitSomething += Penetration.PenetrateHit,
+				UnHook: () => UnifiedSubscribe.HitSomething -= Penetration.PenetrateHit
 			);
 			//HookManager.Register(
 			//	Hook: () => On.Weapon.HitSomething += Penetration.PenetrateHit,
@@ -342,8 +312,8 @@ public static class Hooks
 				UnHook: () => On.Player.Die -= Deflagration.Player_Die
 			);
 			HookManager.Register(
-				Hook: () => HitSomething += Deflagration.Deflagration_HitSomething,
-				UnHook: () => HitSomething -= Deflagration.Deflagration_HitSomething
+				Hook: () => UnifiedSubscribe.HitSomething += Deflagration.Deflagration_HitSomething,
+				UnHook: () => UnifiedSubscribe.HitSomething -= Deflagration.Deflagration_HitSomething
 			);
 		}
 		#endregion
@@ -401,8 +371,8 @@ public static class Hooks
 		#region ArcLightning
 		{
 			HookManager.Register(
-				Hook: () => HitSomething += ArcLightning.ArcLightning_HitSomething,
-				UnHook: () => HitSomething -= ArcLightning.ArcLightning_HitSomething
+				Hook: () => UnifiedSubscribe.HitSomething += ArcLightning.ArcLightning_HitSomething,
+				UnHook: () => UnifiedSubscribe.HitSomething -= ArcLightning.ArcLightning_HitSomething
 			);
 			HookManager.Register(
 				Hook: () => On.Lizard.Bite += ArcLightning.Lizard_Bite,
@@ -451,7 +421,7 @@ public static class Hooks
 
 
 	#region HitSomething
-	public static event Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> HitSomething
+	public static event Func<Delegate, Weapon, SharedPhysics.CollisionResult, bool, bool> Hit0Something
 	{
 		add
 		{

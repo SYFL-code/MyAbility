@@ -161,7 +161,7 @@ namespace MySlugcat
 				{
 					if (player.slugcatStats.name == SlugcatStats.Name.White)
 					{
-						//PenetrationAbility = true;
+						PenetrationAbility = true;
 						FrameAbility = true;
 						//ArcLightningAbility = true;
 						//DeflagrationAbility = true;
