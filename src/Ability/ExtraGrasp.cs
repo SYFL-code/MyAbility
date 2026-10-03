@@ -38,13 +38,15 @@ namespace MySlugcat.Ability
 	public static class ExtraGrasp
 	{
 		public static int ExtraGraspsCount = 2;
+		public static HashSet<Type> CantGrabToHead = [];
+
 
 		public static void Player_ctor(On.Player.orig_ctor orig, Player player, AbstractCreature abstractCreature, World world)
 		{
 			orig.Invoke(player, abstractCreature, world);
 
-			player.GetModule(out var module);
-			if (module.ExtraGraspAbility)
+
+			if (player.Module.ExtraGraspAbility)
 			{
 				player.grasps = new Player.Grasp[player.grasps.Length + ExtraGraspsCount];
 			}
@@ -55,8 +57,7 @@ namespace MySlugcat.Ability
 
 			if (ow is Player player)
 			{
-				player.GetModule(out var module);
-				if (module.ExtraGraspAbility)
+				if (player.Module.ExtraGraspAbility)
 				{
 					Array.Resize(ref graphics.hands, graphics.hands.Length + ExtraGraspsCount);
 
@@ -68,87 +69,169 @@ namespace MySlugcat.Ability
 			}
 		}
 
+
+		// 交换抓握
 		public static void Creature_SwitchGrasps(On.Creature.orig_SwitchGrasps orig, Creature creature, int a, int b)
 		{
 			if (creature is Player player)
 			{
-				player.GetModule(out var module);
-				if (module.ExtraGraspAbility)
+				if (player.Module.ExtraGraspAbility)
 				{
 					if (player.input[0].y > 0)
 					{
-						bool moved = false;
+						bool hasGrasp0 = player.grasps[0] != null;
+						bool Grasp0ToHead = hasGrasp0 && CanGrabToHead(player, player.grasps[0].grabbed);
 
-						if (player.grasps[0] != null)
+						for (int i = 2; i < player.grasps.Length; i++)
 						{
-							for (int i = 2; i < player.grasps.Length; i++)
+							bool hasGraspi = player.grasps[i] != null;
+							if (hasGrasp0 != hasGraspi)
 							{
-								if (player.grasps[i] == null)
+								if (hasGrasp0 && Grasp0ToHead)
 								{
 									player.grasps[i] = player.grasps[0];
 									player.grasps[0] = null;
-									moved = true;
-									break;
 								}
-							}
-						}
-						else
-						{
-							for (int i = 2; i < player.grasps.Length; i++)
-							{
-								if (player.grasps[i] != null)
+								if (!hasGrasp0)
 								{
 									player.grasps[0] = player.grasps[i];
 									player.grasps[i] = null;
-									moved = true;
-									break;
 								}
+								player.UpdateGraspIndexes();
+								return;
 							}
 						}
 
-						if (moved)
-						{
-							player.UpdateGraspIndexes();
-
-							return;
-						}
-
-						if (player.grasps[0] != null)
+						if (hasGrasp0 && Grasp0ToHead)
 						{
 							if (player.grasps.Length > 2)
 							{
 								orig(creature, 0, 2);
-
 								return;
 							}
 						}
-						else
+						if (!hasGrasp0)
 						{
-							if (player.grasps[1] != null)
+							bool hasGrasp1 = player.grasps[1] != null;
+							bool Grasp1ToHead = hasGrasp1 && CanGrabToHead(player, player.grasps[1].grabbed);
+							if (Grasp1ToHead && player.grasps.Length > 2)
 							{
-								if (player.grasps.Length > 2)
-								{
-									orig(creature, 1, 2);
-
-									return;
-								}
+								orig(creature, 1, 2);
+								return;
 							}
 						}
-
+						//
 					}
 				}
 			}
 
 			orig(creature, a, b);
 		}
+		// 我可以来拾取这个吗
+		public static bool Player_CanIPickThisUp(On.Player.orig_CanIPickThisUp orig, Player player, PhysicalObject obj)
+		{
+			if (player.Module.ExtraGraspAbility)
+			{
+				for (int i = 0; i < player.grasps.Length; i++)
+				{
+					if (player.grasps[i]?.grabbed == obj)
+					{
+						return false;
+					}
+				}
 
+				if (player.grasps[0] != null && player.grasps[1] != null)
+				{
+					if (!CanGrabToHead(player, obj))
+					{
+						return false;
+					}
+				}
+			}
+
+			return orig(player, obj);
+		}
+		// 可以抓握
+		public static bool CanGrabToHead(Player player, PhysicalObject obj)
+		{
+			var grabability = player.Grabability(obj);
+			if (grabability != Player.ObjectGrabability.OneHand)
+			{
+				return false;
+			}
+
+			//if (File.Exists(OutputLogFilePath))
+			//{
+
+			//}
+
+			// 业力花
+			if (obj is KarmaFlower)
+			{
+				return false;
+			}
+			// 黏菌
+			if (obj is SlimeMold)
+			{
+				return false;
+			}
+			// 鞭炮草
+			if (obj is FirecrackerPlant)
+			{
+				return false;
+			}
+			// 拾荒者炸弹
+			if (obj is ScavengerBomb)
+			{
+				return false;
+			}
+			// 爆米花
+			if (obj is SeedCob)
+			{
+				return false;
+			}
+			// 孢子植物
+			if (obj is SporePlant)
+			{
+				return false;
+			}
+			if (obj is PuffBall)
+			{
+				return false;
+			}
+			if (obj is FlareBomb)
+			{
+				return false;
+			}
+			if (obj is FlyLure)
+			{
+				return false;
+			}
+			if (obj is BubbleGrass)
+			{
+				return false;
+			}
+			// 秃鹫面具
+			if (obj is VultureMask)
+			{
+				return false;
+			}
+			if (obj is NeedleEgg)
+			{
+				return false;
+			}
+			return true;
+		}
+
+
+		// 图形模块已更新
 		public static void GraphicsModuleUpdated(On.Player.orig_GraphicsModuleUpdated orig, Player player, bool actuallyViewed, bool eu)
 		{
 			orig(player, actuallyViewed, eu);
 
-			for (int i = 0; i < player.grasps.Length; i++)
+			for (int i = 2; i < player.grasps.Length; i++)
 			{
-				if (player.grasps[i] != null && i >= 2)
+				if (player.grasps[i] != null)
 				{
 					var grasp = player.grasps[i];               // 当前抓取实例
 					var grabbed = grasp.grabbed;                // 被抓取的对象
@@ -157,6 +240,8 @@ namespace MySlugcat.Ability
 
 					if (grabbed is Player grabbedPlayer && !grabbedPlayer.dead)
 					{
+						Log.LogDebug($"Player");
+
 						Vector2 direction = Custom.DirVec(mainChunk.pos, grabbedChunk.pos);
 						float currentDistance = Vector2.Distance(mainChunk.pos, grabbedChunk.pos);
 						float desiredDistance = 15f;
@@ -197,6 +282,8 @@ namespace MySlugcat.Ability
 					}
 					else if (player.HeavyCarry(grabbed))
 					{
+						Log.LogDebug($"player.HeavyCarry(grabbed)");
+
 						Vector2 direction = Custom.DirVec(mainChunk.pos, grabbedChunk.pos);
 						float currentDistance = Vector2.Distance(mainChunk.pos, grabbedChunk.pos);
 						float desiredDistance = 5f + grabbedChunk.rad;
@@ -241,9 +328,12 @@ namespace MySlugcat.Ability
 						{
 							player.ReleaseGrasp(i);
 						}
+						//grabbedChunk.pos -= new Vector2(0, 0f - (20f * ((i - 2) / 2)));
 					}
 					else if (actuallyViewed)
 					{
+						//Log.LogDebug($"actuallyViewed");
+
 						int index = i % 2;
 						float toward = (index == 0) ? (-1f) : 1f;
 
@@ -253,13 +343,16 @@ namespace MySlugcat.Ability
 						// 手部跟随图形模块的手
 						if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics playerGraphics)
 						{
-							Vector2 anchor = playerGraphics.head.pos + new Vector2(10f * toward, 3f);
+							Vector2 anchor = playerGraphics.head.pos + new Vector2(10f * toward, 0f - (15f * ((i - 2) / 2)));
+							//Log.LogDebug(i);
 							grabbedChunk.MoveFromOutsideMyUpdate(eu, anchor);
+							//grabbedChunk.HardSetPosition(anchor);
 
 							//grabbedChunk.vel = playerGraphics.hands[i].vel;
 							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[i].pos);
 
 							grabbedChunk.vel = playerGraphics.hands[index].vel;
+							//grabbedChunk.vel = Vector2.zero;
 							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[index].pos + new Vector2(3 * toward, 3f));
 						}
 
@@ -273,99 +366,14 @@ namespace MySlugcat.Ability
 					}
 					else
 					{
+						Log.LogDebug($"ExtraGrasp: {i} is not actually viewed.");
+
 						grabbedChunk.pos = player.bodyChunks[0].pos;
 						grabbedChunk.vel = mainChunk.vel;
 					}
 				}
 			}
 		}
-
-		public static bool Player_CanIPickThisUp(On.Player.orig_CanIPickThisUp orig, Player player, PhysicalObject obj)
-		{
-			for (int i = 0; i < player.grasps.Length; i++)
-			{
-				if (player.grasps[i] != null && player.grasps[i].grabbed != null)
-				{
-					if (player.grasps[i].grabbed == obj)
-					{
-						return false;
-					}
-					//if (player.Grabability(player.grasps[i].grabbed) > Player.ObjectGrabability.OneHand)
-					//{
-					//	num2++;
-					//}
-				}
-			}
-
-			player.GetModule(out var module);
-			if (module.ExtraGraspAbility)
-			{
-				if (player.grasps[0] != null && player.grasps[1] != null)
-				{
-					var grabability = player.Grabability(obj);
-					if (grabability != Player.ObjectGrabability.OneHand)
-					{
-						return false;
-					}
-					if (obj is KarmaFlower)
-					{
-						return false;
-					}
-					if (obj is SlimeMold)
-					{
-						return false;
-					}
-					if (obj is FirecrackerPlant)
-					{
-						return false;
-					}
-					if (obj is ScavengerBomb)
-					{
-						return false;
-					}
-					if (obj is SeedCob)
-					{
-						return false;
-					}
-					if (obj is SporePlant)
-					{
-						return false;
-					}
-					if (obj is PuffBall)
-					{
-						return false;
-					}
-					if (obj is FlareBomb)
-                    {
-						return false;
-                    }
-                    if (obj is FlyLure)
-                    {
-                        return false;
-                    }
-                    if (obj is BubbleGrass)
-                    {
-                        return false;
-                    }
-                    if (obj is VultureMask)
-                    {
-                        return false;
-                    }
-                    if (obj is NeedleEgg)
-                    {
-                        return false;
-                    }
-                }
-				//if (player.Grabability(obj) == Player.ObjectGrabability.CantGrab)
-				//{
-				//    return false;
-				//}
-				//return true;
-			}
-
-			return orig(player, obj);
-		}
-
 		public static void PlayerGraphics_ThrowObject(On.PlayerGraphics.orig_ThrowObject orig, PlayerGraphics playerGraphics, int grasp, PhysicalObject obj)
 		{
 			// 额外槽不走原版手部动画
@@ -375,16 +383,53 @@ namespace MySlugcat.Ability
 			}
 			orig(playerGraphics, grasp, obj);
 		}
+		public static Vector2 GetHeldItemDirection(On.Player.orig_GetHeldItemDirection orig, Player player, int hand)
+		{
+			if (!player.Module.ExtraGraspAbility)
+			{
+				return orig(player, hand);
+			}
+
+			float toward = ((hand % 2) == 0) ? (-1f) : 1f;
+
+			Vector2 vector = Custom.DirVec(player.mainBodyChunk.pos, player.grasps[hand].grabbed.bodyChunks[0].pos) * toward;
+			if (player.animation != Player.AnimationIndex.HangFromBeam)
+			{
+				vector = Custom.PerpendicularVector(vector);
+			}
+			if (player.bodyMode == Player.BodyModeIndex.Crawl)
+			{
+				vector = Custom.DirVec(player.bodyChunks[1].pos, Vector2.Lerp(player.grasps[hand].grabbed.bodyChunks[0].pos, player.bodyChunks[0].pos, 0.8f));
+			}
+			else if (player.animation == Player.AnimationIndex.ClimbOnBeam)
+			{
+				vector.y = Mathf.Abs(vector.y);
+				vector = Vector3.Slerp(vector, Custom.DirVec(player.bodyChunks[1].pos, player.bodyChunks[0].pos), 0.75f);
+			}
+			else if (player.grasps[hand].grabbed is Spear)
+			{
+				if (ModManager.CoopAvailable && player.jollyButtonDown && player.handPointing == hand)
+				{
+					vector = player.PointDir();
+				}
+				if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics graphics)
+				{
+					vector = Vector3.Slerp(vector,
+						Custom.DegToVec((80f +
+						(Mathf.Cos((player.animationFrame + (player.leftFoot ? 9 : 3)) / 12f * 2f * 3.1415927f) * 4f * graphics.spearDir)) * graphics.spearDir),
+						Mathf.Abs(graphics.spearDir));
+				}
+			}
+			return vector;
+		}
+
 
 		public static void Player_GrabUpdate(On.Player.orig_GrabUpdate orig, Player player, bool eu)
 		{
-			player.GetModule(out var module);
-			if (module.ExtraGraspAbility)
+			if (player.Module.ExtraGraspAbility)
 			{
 				if (Plugin.DebugMode && Input.GetKeyDown("c"))
 				{
-					Log.LogInfo($"grasps");
-
 					if (player.grasps[0] != null || player.grasps[2] != null)
 					{
 						player.SwitchGrasps(0, 2);
@@ -393,12 +438,8 @@ namespace MySlugcat.Ability
 					{
 						player.SwitchGrasps(1, 3);
 					}
-				}//
+				}
 
-				//if (player.input[0].pckp && !player.input[1].pckp && player.switchHandsProcess == 0f && !player.isSlugpup)
-				//{
-
-				//}
 
 				if (player.input[0].pckp && !player.input[1].pckp && player.switchHandsProcess == 0f && !player.isSlugpup)
 				{
@@ -409,7 +450,6 @@ namespace MySlugcat.Ability
 					//{
 					//	flag5 = false;
 					//}
-
 					if (flag5)
 					{
 						if (player.switchHandsCounter == 0)
@@ -430,7 +470,7 @@ namespace MySlugcat.Ability
 					}
 				}
 
-
+				// 投掷
 				/*
 				//int wantToThrow = player.wantToThrow;
 				//if (wantToThrow > 0)
@@ -472,6 +512,7 @@ namespace MySlugcat.Ability
 
 			orig(player, eu);
 		}
+
 		public static void IL_Player_GrabUpdate(ILContext il)
 		{
 			try
@@ -510,8 +551,7 @@ namespace MySlugcat.Ability
 
 					c.EmitDelegate<Func<Player, int>>(player =>
 					{
-						player.GetModule(out var module);
-						if (module.ExtraGraspAbility)
+						if (player.Module.ExtraGraspAbility)
 						{
 							if (player.grasps[0] != null && player.HeavyCarry(player.grasps[0].grabbed))
 							{
@@ -726,7 +766,6 @@ namespace MySlugcat.Ability
 				Log.Instance.AppendLogText($"Exception: {ex}");
 			}
 		}
-
 		public static void IL_PlayerGraphics_Update(ILContext il)
 		{
 			try
@@ -864,87 +903,7 @@ namespace MySlugcat.Ability
 			}
 		}
 
-		public static Vector2 GetHeldItemDirection(On.Player.orig_GetHeldItemDirection orig, Player player, int hand)
-		{
-			player.GetModule(out var module);
-			if (module.ExtraGraspAbility)
-			{
-				float toward = ((hand % 2) == 0) ? (-1f) : 1f;
 
-				Vector2 vector = Custom.DirVec(player.mainBodyChunk.pos, player.grasps[hand].grabbed.bodyChunks[0].pos) * toward;
-				if (player.animation != Player.AnimationIndex.HangFromBeam)
-				{
-					vector = Custom.PerpendicularVector(vector);
-				}
-				if (player.bodyMode == Player.BodyModeIndex.Crawl)
-				{
-					vector = Custom.DirVec(player.bodyChunks[1].pos, Vector2.Lerp(player.grasps[hand].grabbed.bodyChunks[0].pos, player.bodyChunks[0].pos, 0.8f));
-				}
-				else if (player.animation == Player.AnimationIndex.ClimbOnBeam)
-				{
-					vector.y = Mathf.Abs(vector.y);
-					vector = Vector3.Slerp(vector, Custom.DirVec(player.bodyChunks[1].pos, player.bodyChunks[0].pos), 0.75f);
-				}
-				else if (player.grasps[hand].grabbed is Spear)
-				{
-					if (ModManager.CoopAvailable && player.jollyButtonDown && player.handPointing == hand)
-					{
-						vector = player.PointDir();
-					}
-					if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics graphics)
-					{
-						vector = Vector3.Slerp(vector,
-							Custom.DegToVec((80f +
-							(Mathf.Cos((player.animationFrame + (player.leftFoot ? 9 : 3)) / 12f * 2f * 3.1415927f) * 4f * graphics.spearDir)) * graphics.spearDir),
-							Mathf.Abs(graphics.spearDir));
-					}
-				}
-				return vector;
-			}
-			return orig(player, hand);
-		}
-
-		/*
-		//public static void Player_GraphicsModuleUpdated(ILContext il)
-		//{
-		//	try
-		//	{
-		//		ILCursor c = new ILCursor(il);
-
-		//		// for (int i = 0; i < 2; i++)
-		//		//IL_0621: ldloc.0
-		//		//IL_0622: ldc.i4.2
-		//		//IL_0623: blt IL_003f
-		//		if (c.TryGotoNext(MoveType.Before,
-		//				i => i.MatchLdloc(0),
-		//				i => i.MatchLdcI4(2),
-		//				i => i.Match(OpCodes.Blt) || i.Match(OpCodes.Blt_S)))
-		//		{
-		//			// c 现在指向 ldloc.0，把它保留下来
-		//			c.GotoNext(MoveType.Before, i => i.MatchLdcI4(2));  // c 移到 ldc.i4.2 前
-		//			c.Remove();                                          // 只删 ldc.i4.2
-
-		//			// 此刻栈上已有 [i]（ldloc.0 已执行），压入 length
-		//			c.Emit(OpCodes.Ldarg_0);
-		//			c.EmitDelegate<Func<Player, int>>(p => p.grasps.Length);
-		//			// 栈变成 [i, length]，下一条 blt 正常判断 i < length
-
-		//			Log.LogInfo("Player_GraphicsModuleUpdated: loop bound -> grasps.Length");
-		//		}
-		//		else
-		//		{
-		//			Log.LogWarning("Player_GraphicsModuleUpdated: 未找到 i<2 的循环条件，跳过");
-		//		}
-
-		//		if (Plugin.DebugMode)
-		//			Log.Instance.AppendLogText(il.ToString());
-		//	}
-		//	catch (Exception ex)
-		//	{
-		//		Log.Instance.AppendLogText($"[Player_GraphicsModuleUpdated] Exception: {ex}");
-		//	}
-		//}
-		*/
 
 		// SwallowObject
 		// GraphicsModuleUpdated
