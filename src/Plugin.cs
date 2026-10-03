@@ -16,7 +16,6 @@ using Noise;
 using On;
 using RewiredConsts;
 using RWCustom;
-using Scrap;
 using Smoke;
 using System;
 using System.Collections;
@@ -111,6 +110,7 @@ public sealed class Plugin : BaseUnityPlugin
 		}
 		AppDomain.CurrentDomain.SetData(OWNER_KEY, this);
 		Log.LogInfo("成为活跃实例，开始注册钩子");
+		// OnEnable() with MachineConnector.ReloadConfig() & .SetRegisteredOI()
 
 
 
@@ -234,7 +234,7 @@ public sealed class Plugin : BaseUnityPlugin
 		}
 		catch (Exception ex)
 		{
-			Log.LogError(Helper.Translate("Error registering option interface: ##").Replace("##", string.Format("{0}", ex)));
+			Log.LogError("Error registering option interface: ##".Translate.Replace("##", string.Format("{0}", ex)));
 		}
 	}
 }

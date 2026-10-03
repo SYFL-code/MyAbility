@@ -190,10 +190,10 @@ public static class Hooks
 				Hook: () => On.Lizard.SpearStick += StalwartScute.Lizard_SpearStick,
 				UnHook: () => On.Lizard.SpearStick -= StalwartScute.Lizard_SpearStick
 			);
-			//HookManager.Register(
-			//	Hook: () => On.Scavenger.SpearStick += StalwartScute.Scavenger_SpearStick,
-			//	UnHook: () => On.Scavenger.SpearStick -= StalwartScute.Scavenger_SpearStick
-			//);
+			HookManager.Register(
+				Hook: () => On.Scavenger.SpearStick += StalwartScute.Scavenger_SpearStick,
+				UnHook: () => On.Scavenger.SpearStick -= StalwartScute.Scavenger_SpearStick
+			);
 			HookManager.Register(
 				Hook: () => On.Lizard.Violence += StalwartScute.Lizard_Violence,
 				UnHook: () => On.Lizard.Violence -= StalwartScute.Lizard_Violence
@@ -256,6 +256,10 @@ public static class Hooks
 				Hook: () => On.Lizard.HitInMouth += Penetration.HitInMouth,
 				UnHook: () => On.Lizard.HitInMouth -= Penetration.HitInMouth
 			);
+			HookManager.Register(
+				Hook: () => On.Weapon.Update += Penetration.Weapon_Update,
+				UnHook: () => On.Weapon.Update -= Penetration.Weapon_Update
+			);
 		}
 		{
 			// HitSomething
@@ -263,36 +267,6 @@ public static class Hooks
 				Hook: () => UnifiedSubscribe.HitSomething += Penetration.PenetrateHit,
 				UnHook: () => UnifiedSubscribe.HitSomething -= Penetration.PenetrateHit
 			);
-			//HookManager.Register(
-			//	Hook: () => On.Weapon.HitSomething += Penetration.PenetrateHit,
-			//	UnHook: () => On.Weapon.HitSomething -= Penetration.PenetrateHit
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.Spear.HitSomething += Penetration.PenetrateHit,
-			//	UnHook: () => On.Spear.HitSomething -= Penetration.PenetrateHit
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.Rock.HitSomething += Penetration.PenetrateHit,
-			//	UnHook: () => On.Rock.HitSomething -= Penetration.PenetrateHit
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.ScavengerBomb.HitSomething += Penetration.PenetrateHit,
-			//	UnHook: () => On.ScavengerBomb.HitSomething -= Penetration.PenetrateHit
-			//);
-			//if (ModManager.MSC)
-			//{
-			//	HookManager.Register(
-			//		Hook: () => On.MoreSlugcats.LillyPuck.HitSomething += Penetration.PenetrateHit,
-			//		UnHook: () => On.MoreSlugcats.LillyPuck.HitSomething -= Penetration.PenetrateHit
-			//	);
-			//}
-			//if (ModManager.Watcher)
-			//{
-			//	HookManager.Register(
-			//		Hook: () => On.Boomerang.HitSomething += Penetration.PenetrateHit,
-			//		UnHook: () => On.Boomerang.HitSomething -= Penetration.PenetrateHit
-			//	);
-			//}
 		}
 		#endregion
 
@@ -485,11 +459,7 @@ public static class Hooks
 		where O : Delegate
 		where W : Weapon
 	{
-		if (orig_ is UnifiedHooks.orig_HitSomething orig_HitSomething)
-		{
-			return orig_HitSomething.Invoke;
-		}
-		else if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
+		if (orig_ is On.Weapon.orig_HitSomething weapon_orig)
 		{
 			return weapon_orig.Invoke;
 		}

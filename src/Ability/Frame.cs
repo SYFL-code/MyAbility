@@ -190,13 +190,17 @@ namespace MySlugcat.Ability
 				return orig_HitSomething(orig_, weapon, result, eu);
 			}
 
-
+			if (Plugin.DebugMode && result.obj is Player player && player.Module.FrameAbility)
+			{
+				result.obj = null;
+				result.chunk = null;
+				result.onAppendagePos = null;
+			}
 			if (result.obj is Creature hitCreature)
 			{
-				hitCreature.GetModule(out var module);
-				if (module.FrameAbility)
+				if (hitCreature.Module.FrameAbility)
 				{
-					if (!module.CrystalShieldAbility || !hitCreature.Shield.validity)
+					if (!hitCreature.Module.CrystalShieldAbility || !hitCreature.Shield.validity)
 					{
 						Creature? target = Helper.FindNearestCreature(hitCreature.mainBodyChunk.pos, hitCreature.room,
 							[hitCreature], [hitCreature.GetType(), typeof(Fly)]);
@@ -304,7 +308,7 @@ namespace MySlugcat.Ability
 			orig.Invoke(creature, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
 		}
 
-		public static void Lizard_Bite(On.Lizard.orig_Bite orig, Lizard lizard, BodyChunk chunk)
+		public static void Lizard_Bite(On.Lizard.orig_Bite orig, Lizard lizard, BodyChunk? chunk)
 		{
 			if (chunk?.owner is Creature hitCreature)
 			{

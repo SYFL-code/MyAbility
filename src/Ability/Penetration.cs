@@ -366,6 +366,48 @@ namespace MySlugcat.Ability
 			}
 		}
 
+		public static void Weapon_Update(On.Weapon.orig_Update orig, Weapon weapon, bool eu)
+		{
+			var spear = weapon as Spear;
+			bool orig_alwaysStickInWalls = spear?.alwaysStickInWalls ?? false;
+			if (spear != null)
+			{
+				Room room = weapon.room;
+
+				if (Custom.DistLess(spear.thrownPos, spear.firstChunk.pos, 560f * Mathf.Max(1f, spear.spearDamageBonus)) &&
+					spear.firstChunk.ContactPoint == spear.throwDir &&
+					room.GetTile(spear.firstChunk.pos).Terrain == Room.Tile.TerrainType.Air &&
+					room.GetTile(spear.firstChunk.pos + (spear.throwDir.ToVector2() * 20f)).Terrain == Room.Tile.TerrainType.Solid //&&
+					//(Random.value < ((spear is ExplosiveSpear) ? 0.8f : 0.33f) ||
+					//Custom.DistLess(spear.thrownPos, spear.firstChunk.pos, 140f) ||
+					//spear.alwaysStickInWalls)
+					)
+				{
+					weapon.GetModule(out var weaponModule);
+					if (weaponModule.Owner.TryGetTarget(out var target) && target is Creature thrownBy &&
+						thrownBy.GetModule().PenetrationAbility)
+					{
+						Log.LogDebug($"vel:{weapon.firstChunk.vel.magnitude}");
+						if (0.98f - (weapon.firstChunk.vel.magnitude * 6.0f / 100f) > Random.value)
+						{
+							spear.alwaysStickInWalls = true;
+						}
+					}
+				}
+
+			}
+
+			orig(weapon, eu);
+
+			if (spear != null)
+			{
+				if (!orig_alwaysStickInWalls)
+				{
+					spear.alwaysStickInWalls = false;
+				}
+			}
+		}
+
 		public static bool HitInMouth(On.Lizard.orig_HitInMouth orig, Lizard lizard, Vector2 direction)
 		{
 			lizard.GetPenetrationModule(out var module);

@@ -50,11 +50,6 @@ namespace MySlugcat
 		{
 			return creature.Module;
 		}
-		public static CreatureModule GetModule(this Creature creature, out CreatureModule module)
-		{
-			module = creature.Module;
-			return module;
-		}
 		extension(Creature creature)
 		{
 			public CreatureModule Module => (CreatureModule)((PhysicalObject)creature).GetModule();
@@ -109,12 +104,7 @@ namespace MySlugcat
 	{
 		private WeakReference<Player> _playerRef;
 
-		//public bool PenetrationAbility = false;
-		//public bool FrameAbility = false;
-		//public bool ArcLightningAbility = false;
 		public bool CamouflageAbility = false;
-		//public bool DeflagrationAbility = false;
-		//public bool TrackingThrowAbility = false;
 		public bool ExtraGraspAbility = false;
 
 		public PlayerModule(Player player) :
@@ -124,17 +114,13 @@ namespace MySlugcat
 
 			if (player.slugcatStats.name == SlugcatStats.Name.White)
 			{
-				//PenetrationAbility = true;
-				//FrameAbility = true;
-				//ArcLightningAbility = true;
-				CamouflageAbility = true;
-				//DeflagrationAbility = true;
-				//TrackingThrowAbility = true;
+				//CamouflageAbility = true;
 			}
 			if (Debugger.bools[2, true, "ExtraGraspAbility"])
 			{
-				ExtraGraspAbility = true;
+				//ExtraGraspAbility = true;
 			}
+			ExtraGraspAbility = true;
 		}
 	}
 
@@ -168,12 +154,13 @@ namespace MySlugcat
 						//TrackingThrowAbility = true;
 					}
 				}
-				else
+				else if (creature is Centipede)
 				{
+					//ArcLightningAbility = true;
 				}
 				//ArcLightningAbility = true;
 				//CrystalShieldAbility = true;
-				StalwartScute = true;
+				//StalwartScute = true;
 			}
 		}
 	}

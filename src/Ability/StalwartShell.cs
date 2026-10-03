@@ -140,6 +140,12 @@ namespace MySlugcat.Ability
 			{
 				if (this.whiteFlicker > 0)
 					this.whiteFlicker--;
+
+
+				if (Plugin.DebugMode && Input.GetKey("x"))
+				{
+					this.damageState = 0;
+                }
 			}
 			public void TakeHit()
 			{
@@ -164,6 +170,17 @@ namespace MySlugcat.Ability
 		}
 
 		public static bool Lizard_SpearStick(On.Lizard.orig_SpearStick orig, Lizard self, Weapon source, float dmg,
+			BodyChunk chunk, PhysicalObject.Appendage.Pos onAppendagePos, Vector2 direction)
+		{
+			if (ScuteHost.SpearStick(self, source, chunk, onAppendagePos))
+			{
+				return false;
+			}
+
+			return orig(self, source, dmg, chunk, onAppendagePos, direction);
+		}
+
+		public static bool Scavenger_SpearStick(On.Scavenger.orig_SpearStick orig, Scavenger self, Weapon source, float dmg,
 			BodyChunk chunk, PhysicalObject.Appendage.Pos onAppendagePos, Vector2 direction)
 		{
 			if (ScuteHost.SpearStick(self, source, chunk, onAppendagePos))
@@ -296,14 +313,23 @@ namespace MySlugcat.Ability
 			On.ScavengerGraphics.orig_InitiateSprites orig, ScavengerGraphics self,
 			RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
 		{
+			// 在 orig 之前移除旧 bands，否则 orig 内部调用 AddToContainer 时会用到失效的旧 bands
+			if (self.scavenger.Module.StalwartScute)
+			{
+				if (ScavengerBands.TryGetValue(self, out _))
+					ScavengerBands.Remove(self);
+			}
+
 			orig(self, sLeaser, rCam);
 
 			if (!self.scavenger.Module.StalwartScute) return;
-			if (ScavengerBands.TryGetValue(self, out _)) return;
 
 			var bands = new ScavengerBodyBands(self, sLeaser.sprites.Length);
-			bands.InitiateSprites(sLeaser, rCam);   // 内部 Array.Resize 追加 sprite
+			bands.InitiateSprites(sLeaser, rCam);   // Array.Resize 追加 sprite
 			ScavengerBands.Add(self, bands);
+
+			// orig 内部的 AddToContainer 已经跑过（那时还没有新 bands），这里手动加一次
+			bands.AddToContainer(sLeaser);
 		}
 		public static void ScavengerGraphics_DrawSprites(
 			On.ScavengerGraphics.orig_DrawSprites orig, ScavengerGraphics self,
@@ -335,26 +361,38 @@ namespace MySlugcat.Ability
 		// 逻辑
 		internal static class ScuteHost
 		{
-			public static bool SpearStick(Lizard lizard, Weapon source,
+			public static bool SpearStick(Creature owner, Weapon source,
 				BodyChunk chunk, PhysicalObject.Appendage.Pos onAppendagePos)
 			{
-				if (!lizard.Module.StalwartScute) return false;
+				if (!owner.Module.StalwartScute) return false;
 				if (source is ExplosiveSpear) return false;
 
 				Spear? spear = source as Spear;
 				if (spear == null || chunk == null || onAppendagePos != null) return false;
 
-				if (!ScuteArmor.TryGetScuteHit(lizard, spear, chunk, out int band, out _, out _))
-					return false;
+				Lizard? lizard = owner as Lizard;
+				Scavenger? scavenger = owner as Scavenger;
+
+				int band = -1;
+				if (lizard != null)
+				{
+					if (!ScuteArmor.TryGetScuteHit(lizard, spear, chunk, out band, out _, out _))
+						return false;
+				}
+				if (scavenger != null)
+				{
+					if (!ScuteArmor.TryGetScuteHit(scavenger, spear, chunk, out band, out _, out _))
+						return false;
+				}
 
 
-				var scute = lizard.Scute;
+				var scute = owner.Scute;
 				scute.LastDeflectSpear = spear;
 				scute.DeflectGrace = 3;
 
-				DamageScuteOnce(lizard, band, spear);
+				DamageScuteOnce(owner, band, spear);
 
-				lizard.room?.PlaySound(SoundID.Lizard_Head_Shield_Deflect, chunk);
+				owner.room?.PlaySound(SoundID.Lizard_Head_Shield_Deflect, chunk);
 
 				return true;
 			}
@@ -1208,10 +1246,11 @@ namespace MySlugcat.Ability
 				return up.sqrMagnitude > 0.0001f ? up.normalized : Vector2.up;
 			}
 
-			private float SpineRad(float f, float timeStacker)
-				=> Mathf.Max(1f, this.sGraphics.OnSpineWidth(Mathf.Clamp01(f), timeStacker) * 0.5f);
+            private const float RadiusScale = 1.5f;
+            private float SpineRad(float f, float timeStacker)
+				=> Mathf.Max(1f, this.sGraphics.OnSpineWidth(Mathf.Clamp01(f), timeStacker) * 0.5f) * RadiusScale;
 
-			private Vector2 SpineDir(float f, float timeStacker)
+            private Vector2 SpineDir(float f, float timeStacker)
 			{
 				var d = this.sGraphics.OnSpineDir(Mathf.Clamp01(f), timeStacker);
 				var dir = new Vector2(d.x, d.y);
@@ -1254,10 +1293,22 @@ namespace MySlugcat.Ability
 
 			public void ApplyPalette(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
 			{
-				// 用拾荒者自己的体色/头色混合出甲片色，已含 darkness 处理
-				this.bandColor = Color.Lerp(
-					Color.Lerp(this.sGraphics.BlendedBodyColor, this.sGraphics.BlendedHeadColor, 0.45f),
-					palette.blackColor, 0.06f);
+                Color baseCol = Color.Lerp(this.sGraphics.BlendedBodyColor, this.sGraphics.BlendedHeadColor, 0.45f);
+
+                // 压暗 + 往暖色/冷色偏一点，模拟骨甲/石甲
+                float h, s, v;
+                Color.RGBToHSV(baseCol, out h, out s, out v);
+                h = Mathf.Repeat(h + 0.04f, 1f);   // 轻微偏色，可正可负
+                s = Mathf.Clamp01(s * 1.15f);      // 饱和度略增
+                v = Mathf.Clamp01(v * 0.70f);      // 明度明显降
+                Color shifted = Color.HSVToRGB(h, s, v);
+
+                this.bandColor = Color.Lerp(shifted, palette.blackColor, 0.15f);
+
+                // 用拾荒者自己的体色/头色混合出甲片色，已含 darkness 处理
+                //this.bandColor = Color.Lerp(
+				//	Color.Lerp(this.sGraphics.BlendedBodyColor, this.sGraphics.BlendedHeadColor, 0.45f),
+				//	palette.blackColor, 0.06f);
 				this.crackColor = palette.blackColor;
 
 				for (int i = 0; i < this.BandCount; i++)
@@ -1312,10 +1363,17 @@ namespace MySlugcat.Ability
 			// 入层：塞进 containers[1]（前肢之后、头/颈/牙之前），并防重复
 			public void AddToContainer(RoomCamera.SpriteLeaser sLeaser)
 			{
-				if (this.TotalSprites == 0 || sLeaser.sprites[this.firstSprite] == null) return;
-				if (sLeaser.sprites[this.firstSprite].container != null) return;
-				for (int i = 0; i < this.TotalSprites; i++)
-					sLeaser.containers[1].AddChild(sLeaser.sprites[this.firstSprite + i]);
+				try
+				{
+					if (this.TotalSprites == 0 || sLeaser.sprites[this.firstSprite] == null) return;
+					if (sLeaser.sprites[this.firstSprite].container != null) return;
+					for (int i = 0; i < this.TotalSprites; i++)
+						sLeaser.containers[2].AddChild(sLeaser.sprites[this.firstSprite + i]);
+				}
+				catch (Exception ex)
+				{
+					Log.LogError(ex);
+				}
 			}
 
 			// ---------- 网格/裂纹/碎片（几何与蜥蜴版相同，只换脊柱采样） ----------

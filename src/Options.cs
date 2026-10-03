@@ -17,8 +17,8 @@ namespace MySlugcat
 		public static float SpawnChance => MyOptions.Instance.spawnChance.Value;
 		public static bool StunLand => MyOptions.Instance.stunLand.Value;
 		public static float StunDuration => MyOptions.Instance.stunDuration.Value;
-        public static string ParticleEffectType => MyOptions.Instance.particleEffectType.Value;
-        public static bool EnableLog => MyOptions.Instance.enableLog.Value;
+		public static string ParticleEffectType => MyOptions.Instance.particleEffectType.Value;
+		public static bool EnableLog => MyOptions.Instance.enableLog.Value;
 	}
 
 	public class MyOptions : OptionInterface
@@ -33,12 +33,12 @@ namespace MySlugcat
 
 		public readonly Configurable<bool> enableLog;
 
-        public MyOptions()
+		public MyOptions()
 		{
 			Instance = this;
 
-            //设置默认值
-            spawnChance = config.Bind<float>($"{Name}_EnderPearl_spawnChance", 0.02f);
+			//设置默认值
+			spawnChance = config.Bind<float>($"{Name}_EnderPearl_spawnChance", 0.02f);
 			stunLand = config.Bind<bool>($"{Name}_EnderPearl_stunLand", false);
 			stunDuration = config.Bind<float>($"{Name}_EnderPearl_stunDuration", 0.5f);
 			particleEffectType = config.Bind<string>($"{Name}_EnderPearl_particleEffectType", "Dotted"); // Dotted Runic
@@ -50,7 +50,7 @@ namespace MySlugcat
 		{
 			base.Initialize();
 
-			OpTab EnderPearlTab = new OpTab(this, "EnderPearl".Translate());
+			OpTab EnderPearlTab = new OpTab(this, "EnderPearl".Translate);
 			this.Tabs = new OpTab[]
 			{
 				EnderPearlTab
@@ -59,36 +59,36 @@ namespace MySlugcat
 
 			EnderPearlTab.AddItems(
 				//标题
-				new OpLabel(30f, 560f, "Ender Pearl".Translate(), true),
+				new OpLabel(30f, 560f, "Ender Pearl".Translate, true),
 
 				// Spawn chance slider (0.00–1.00, in 0.01 steps)
-				new OpLabel(30f, 510f, "World spawn chance".Translate()),
+				new OpLabel(30f, 510f, "World spawn chance".Translate),
 				new OpFloatSlider(spawnChance, new Vector2(30f, 470f), 300, 2)
 				{
 					min = 0f,
 					max = 1f,
-					description = "Chance (0.00–1.00) that a pearl appears in an eligible room.".Translate()
+					description = "Chance (0.00–1.00) that a pearl appears in an eligible room.".Translate
 				},
 
-				new OpLabel(new Vector2(50f, 430f), new Vector2(200f, 24f), "Stun upon landing".Translate()),
+				new OpLabel(new Vector2(50f, 430f), new Vector2(200f, 24f), "Stun upon landing".Translate),
 				new OpCheckBox(stunLand, new Vector2(30f, 430f))
 				{
-					description = "Whether the player gets stunned when teleporting.".Translate()
+					description = "Whether the player gets stunned when teleporting.".Translate
 				},
 
-				new OpLabel(new Vector2(50f, 390f), new Vector2(200f, 24f), "Stun duration".Translate()),
+				new OpLabel(new Vector2(50f, 390f), new Vector2(200f, 24f), "Stun duration".Translate),
 				new OpTextBox(stunDuration, new Vector2(30f, 390f), 50f),
 
-				new OpLabel(new Vector2(5f, 350f), new Vector2(200f, 24f), "Particle effect type".Translate()),
-				new OpComboBox(particleEffectType, new Vector2(38f, 310f), 150f, Helper.ToListItem(new string[] { "Dotted", "Runic" }).ToList())
+				new OpLabel(new Vector2(5f, 350f), new Vector2(200f, 24f), "Particle effect type".Translate),
+				new OpComboBox(particleEffectType, new Vector2(38f, 310f), 150f, (new[]{"Dotted", "Runic"}).ToListItem.ToList())
 				{
-					description = "Select the type of particle effect.".Translate()
+					description = "Select the type of particle effect.".Translate
 				},
 
-				new OpLabel(new Vector2(50f, 40f), new Vector2(200f, 24f), "Enable Log".Translate()),
+				new OpLabel(new Vector2(50f, 40f), new Vector2(200f, 24f), "Enable Log".Translate),
 				new OpCheckBox(enableLog, new Vector2(30f, 40f))
 				{
-					description = "Enable logging.".Translate()
+					description = "Enable logging.".Translate
 				}
 
 				//// Safe-search radius

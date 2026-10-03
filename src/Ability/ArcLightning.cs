@@ -68,7 +68,7 @@ namespace MySlugcat.Ability
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
 
-		public static void Lizard_Bite(On.Lizard.orig_Bite orig, Lizard lizard, BodyChunk chunk)
+		public static void Lizard_Bite(On.Lizard.orig_Bite orig, Lizard lizard, BodyChunk? chunk)
 		{
 			if (lizard.Module.ArcLightningAbility)
 			{
@@ -96,6 +96,16 @@ namespace MySlugcat.Ability
 						{
 							// 反击
 							ElectricShock(lizard, hitCreature, hitCreature);
+
+							// Centipede.TotalMass  0.2143  0.5776  1.1113  2.5877  5.0781
+							// lizard.TotalMass  7.5  2.1  1.7
+							float baseChance = 0.2f;                     // 基础 20%
+							float massChance = Mathf.Clamp01(hitCreature.TotalMass / lizard.TotalMass);
+							float finalChance = Mathf.Clamp01(baseChance + (massChance * 0.75f));
+							if (finalChance > Random.value)
+							{
+								chunk = null;
+							}
 						}
 					}
 				}

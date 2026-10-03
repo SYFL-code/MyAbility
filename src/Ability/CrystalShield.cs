@@ -110,7 +110,7 @@ namespace MySlugcat.Ability
 			return Hooks.orig_HitSomething(orig_, weapon, result, eu);
 		}
 
-		public static void Violence(orig_Violence orig, Creature creature, BodyChunk source, Vector2? directionAndMomentum,
+		public static void Violence(On.Creature.orig_Violence orig, Creature creature, BodyChunk source, Vector2? directionAndMomentum,
 			BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage,
 			Creature.DamageType type, float damage, float stunBonus)
 		{

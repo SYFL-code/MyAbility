@@ -300,19 +300,68 @@ namespace MySlugcat.Ability
 			player.GetModule(out var module);
 			if (module.ExtraGraspAbility)
 			{
-                //if (player.grasps[0] != null && player.grasps[1] != null)
-                //{
-                //	if (player.Grabability(obj) > Player.ObjectGrabability.OneHand)
-                //	{
-                //		return false;
-                //	}
-                //}
-                if (player.Grabability(obj) == Player.ObjectGrabability.CantGrab)
-                {
-                    return false;
+				if (player.grasps[0] != null && player.grasps[1] != null)
+				{
+					var grabability = player.Grabability(obj);
+					if (grabability != Player.ObjectGrabability.OneHand)
+					{
+						return false;
+					}
+					if (obj is KarmaFlower)
+					{
+						return false;
+					}
+					if (obj is SlimeMold)
+					{
+						return false;
+					}
+					if (obj is FirecrackerPlant)
+					{
+						return false;
+					}
+					if (obj is ScavengerBomb)
+					{
+						return false;
+					}
+					if (obj is SeedCob)
+					{
+						return false;
+					}
+					if (obj is SporePlant)
+					{
+						return false;
+					}
+					if (obj is PuffBall)
+					{
+						return false;
+					}
+					if (obj is FlareBomb)
+                    {
+						return false;
+                    }
+                    if (obj is FlyLure)
+                    {
+                        return false;
+                    }
+                    if (obj is BubbleGrass)
+                    {
+                        return false;
+                    }
+                    if (obj is VultureMask)
+                    {
+                        return false;
+                    }
+                    if (obj is NeedleEgg)
+                    {
+                        return false;
+                    }
                 }
-                return true;
-            }
+				//if (player.Grabability(obj) == Player.ObjectGrabability.CantGrab)
+				//{
+				//    return false;
+				//}
+				//return true;
+			}
 
 			return orig(player, obj);
 		}

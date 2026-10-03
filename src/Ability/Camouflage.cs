@@ -1,7 +1,6 @@
 ﻿using CommonUtils.Core;
 using HarmonyLib;
 using MonoMod.RuntimeDetour;
-using Scrap;
 using System;
 using UnityEngine;
 using UnityEngine.UIElements;

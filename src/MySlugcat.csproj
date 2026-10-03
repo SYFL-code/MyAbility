@@ -93,7 +93,7 @@
 
 	<ItemGroup>
 	  <!-- <PackageReference Include="MonoWeaver.Cecil10" Version="0.2.0" /> -->
-	  <PackageReference Include="System.Memory" Version="4.6.0" />
+	  <PackageReference Include="System.Memory" Version="4.6.3" />
 	  <PackageReference Include="PolySharp" Version="1.16.0">
 		<PrivateAssets>all</PrivateAssets>
 		<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -192,16 +192,11 @@
 		<Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Plugins)" />
 
 		<!-- Newtonsoft：内容相同就跳过（不产生文件事件） -->
-		<Copy SourceFiles="../../CommonUtils/lib/Newtonsoft.Json.dll"
-			  DestinationFolder="$(Plugins)"
-			  SkipUnchangedFiles="true" />
+		<Copy SourceFiles="../../CommonUtils/lib/Newtonsoft.Json.dll" DestinationFolder="$(Plugins)" SkipUnchangedFiles="true" />
 
 		<!-- PDB：只在 Debug 模式复制，Release 模式删除 -->
-		<Copy Condition="'$(Configuration)' == 'Debug'"
-			  SourceFiles="$(TargetDir)$(TargetName).pdb"
-			  DestinationFolder="$(Plugins)" />
-		<Delete Condition="'$(Configuration)' == 'Release'"
-				Files="$(Plugins)$(TargetName).pdb" />
+		<Copy Condition="'$(Configuration)' == 'Debug'" SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(Plugins)" />
+		<Delete Condition="'$(Configuration)' == 'Release'" Files="$(Plugins)$(TargetName).pdb" />
 	</Target>
 	
 </Project>
