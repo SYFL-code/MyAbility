@@ -43,8 +43,7 @@ namespace MySlugcat.Ability
 				return orig_HitSomething(orig_, weapon, result, eu);
 			}
 
-			weapon.GetModule(out var weaponModule);
-			if (weaponModule.Owner.TryGetTarget(out var target) && target is Creature thrownBy)
+			if (weapon.Module.Owner.TryGetTarget(out var target) && target is Creature thrownBy)
 			{
 				if (thrownBy.Module.ArcLightningAbility)
 				{

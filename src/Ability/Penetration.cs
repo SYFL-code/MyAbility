@@ -48,7 +48,10 @@ namespace MySlugcat.Ability
 			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy && thrownBy.GetModule().PenetrationAbility)
 			{
 				Room room = weapon.room;
-				if (room != null && weapon is not ExplosiveSpear && weapon is not ScavengerBomb)
+				// ExplosiveSpear 炸矛
+				// ElectricSpear 电矛
+				// ScavengerBomb 炸弹
+				if (room != null && weapon is not ScavengerBomb)
 				{
 					Spear? spear = weapon as Spear;
 

@@ -45,8 +45,7 @@ namespace MySlugcat.Ability
 			orig.Invoke(player, eu);
 
 
-			player.GetModule(out var playerModule);
-			if (playerModule.CamouflageAbility)
+			if (player.Module.CamouflageAbility)
 			{
 				var module = player.GetCamouflageModule();
 
@@ -89,8 +88,7 @@ namespace MySlugcat.Ability
 		{
 			if (player != null)
 			{
-				player.GetModule(out var playerModule);
-				if (playerModule.CamouflageAbility)
+				if (player.Module.CamouflageAbility)
 				{
 					var module = player.GetCamouflageModule();
 
@@ -144,9 +142,7 @@ namespace MySlugcat.Ability
 
 
 			Player player = playerGraphics.player;
-			player.GetModule(out var playerModule);
-
-			if (playerModule.CamouflageAbility)
+			if (player.Module.CamouflageAbility)
 			{
 				var module = player.GetCamouflageModule();
 

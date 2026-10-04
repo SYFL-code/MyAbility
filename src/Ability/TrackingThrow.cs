@@ -29,10 +29,9 @@ namespace MySlugcat.Ability
 		public static void Weapon_Thrown(On.Weapon.orig_Thrown orig, Weapon weapon, Creature _thrownBy, Vector2 thrownPos,
 			Vector2? firstFrameTraceFromPos, IntVector2 throwDir, float frc, bool eu)
 		{
-			weapon.GetModule(out var weaponModule);
-			if (weaponModule.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy)
+			if (weapon.Module.Owner.TryGetTarget(out var owner) && owner is Creature thrownBy)
 			{
-				if (thrownBy.GetModule().TrackingThrowAbility)
+				if (thrownBy.Module.TrackingThrowAbility)
 				{
 					Vector2 startPos = weapon.firstChunk.pos;
 					Vector2 vel = weapon.firstChunk.vel;

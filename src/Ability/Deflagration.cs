@@ -146,50 +146,45 @@ namespace MySlugcat.Ability
 				return orig_HitSomething(orig_, weapon, result, eu);
 			}
 
-			weapon.GetModule(out var weaponModule);
-			if (weaponModule.Owner.TryGetTarget(out var target) && target is Creature thrownBy)
+			if (weapon.Module.Owner.TryGetTarget(out var target) && target is Creature thrownBy)
 			{
-				if (thrownBy.GetModule().DeflagrationAbility)
+				if (thrownBy.Module.DeflagrationAbility)
 				{
 					if (result.obj is Creature hitCreature)
 					{
-						weaponModule.stuckInObject.TryGetTarget(out var stuckInObject);
-						if (stuckInObject != hitCreature || weaponModule.stuckInObjectTime > 30)
+						float percentage = 8;
+						if (weapon is Spear)
 						{
-							float percentage = 8;
-							if (weapon is Spear)
+							percentage = 12;
+							if (thrownBy.Module.ArcLightningAbility)
 							{
-								percentage = 12;
-								if (thrownBy.GetModule().ArcLightningAbility)
-								{
-									percentage = 0.1f;
-								}
+								percentage = 0.1f;
 							}
-							else if (weapon is Rock)
-							{
-								percentage = 8;
-							}
-							else if (weapon is ScavengerBomb)
-							{
-								percentage = 60;
-							}
-							else if (weapon is PuffBall)
-							{
-								percentage = 14;
-							}
-							else if (ModManager.MSC && weapon is LillyPuck)
-							{
-								percentage = 8;
-							}
-							else if (ModManager.Watcher && weapon is Boomerang)
-							{
-								percentage = 16;
-							}
+						}
+						else if (weapon is Rock)
+						{
+							percentage = 8;
+						}
+						else if (weapon is ScavengerBomb)
+						{
+							percentage = 60;
+						}
+						else if (weapon is PuffBall)
+						{
+							percentage = 14;
+						}
+						else if (ModManager.MSC && weapon is LillyPuck)
+						{
+							percentage = 8;
+						}
+						else if (ModManager.Watcher && weapon is Boomerang)
+						{
+							percentage = 16;
+						}
 
-							if (percentage > UnityEngine.Random.Range(0, 100))
-							{
-								Explode(weapon, result.chunk, thrownBy);
-							}
+						if (percentage > UnityEngine.Random.Range(0, 100))
+						{
+							Explode(weapon, result.chunk, thrownBy);
 						}
 					}
 				}
@@ -211,7 +206,7 @@ namespace MySlugcat.Ability
 
 
 			Creature creature = player;
-			if (!wasDead && player.dead && creature.GetModule().DeflagrationAbility)
+			if (!wasDead && player.dead && creature.Module.DeflagrationAbility)
 			{
 				if (100 > UnityEngine.Random.Range(0, 100))
 				{

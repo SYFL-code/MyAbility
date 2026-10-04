@@ -114,7 +114,7 @@ namespace MySlugcat
 
 			if (player.slugcatStats.name == SlugcatStats.Name.White)
 			{
-				//CamouflageAbility = true;
+				CamouflageAbility = true;
 			}
 			if (Debugger.bools[2, true, "ExtraGraspAbility"])
 			{
@@ -147,7 +147,6 @@ namespace MySlugcat
 				{
 					if (player.slugcatStats.name == SlugcatStats.Name.White)
 					{
-						PenetrationAbility = true;
 						FrameAbility = true;
 						//ArcLightningAbility = true;
 						//DeflagrationAbility = true;
@@ -158,6 +157,7 @@ namespace MySlugcat
 				{
 					//ArcLightningAbility = true;
 				}
+				PenetrationAbility = true;
 				//ArcLightningAbility = true;
 				//CrystalShieldAbility = true;
 				//StalwartScute = true;
