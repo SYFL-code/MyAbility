@@ -37,7 +37,7 @@ namespace MySlugcat.Ability
 	// 额外抓取
 	public static class ExtraGrasp
 	{
-		public static int ExtraGraspsCount = 2;
+		public static int ExtraGraspsCount = 6;
 		public static HashSet<Type> CantGrabToHead = [];
 
 
@@ -91,14 +91,18 @@ namespace MySlugcat.Ability
 								{
 									player.grasps[i] = player.grasps[0];
 									player.grasps[0] = null;
+
+									player.UpdateGraspIndexes();
+									return;
 								}
 								if (!hasGrasp0)
 								{
 									player.grasps[0] = player.grasps[i];
 									player.grasps[i] = null;
+
+									player.UpdateGraspIndexes();
+									return;
 								}
-								player.UpdateGraspIndexes();
-								return;
 							}
 						}
 
@@ -154,6 +158,11 @@ namespace MySlugcat.Ability
 		// 可以抓握
 		public static bool CanGrabToHead(Player player, PhysicalObject obj)
 		{
+			if (Plugin.DebugMode)
+			{
+				return true;
+			}
+
 			var grabability = player.Grabability(obj);
 			if (grabability != Player.ObjectGrabability.OneHand)
 			{
@@ -233,143 +242,174 @@ namespace MySlugcat.Ability
 			{
 				if (player.grasps[i] != null)
 				{
-					var grasp = player.grasps[i];               // 当前抓取实例
-					var grabbed = grasp.grabbed;                // 被抓取的对象
-					var grabbedChunk = grasp.grabbedChunk;      // 被抓取对象的物理块
-					var mainChunk = player.mainBodyChunk;       // 玩家主身体块
-
-					if (grabbed is Player grabbedPlayer && !grabbedPlayer.dead)
+					try
 					{
-						Log.LogDebug($"Player");
+						Vector2 pos0 = player.bodyChunks[0].pos;
+						Vector2 pos1 = player.bodyChunks[1].pos;
+						Vector2 bodyDir = Custom.DirVec(pos1, pos0); // 身体朝向
+						Vector2 vector2 = Custom.PerpendicularVector(bodyDir); // 侧方
+						Vector2 vector3 = Vector2.Lerp(pos1, pos0, 0.5f);
 
-						Vector2 direction = Custom.DirVec(mainChunk.pos, grabbedChunk.pos);
-						float currentDistance = Vector2.Distance(mainChunk.pos, grabbedChunk.pos);
-						float desiredDistance = 15f;
-
-						float massRatio = grabbedChunk.mass / (mainChunk.mass + grabbedChunk.mass);
-
-						// 如果正在进入管道（捷径）
-						if (player.enteringShortCut != null)
+						Creature.Grasp grasp = player.grasps[i];
+						if (grasp != null && grasp.grabbed != null)
 						{
-							massRatio = 0f;
+							float side = (i % 2 == 0) ? 1f : -1f;
+							float dist = 14f + (9f * ((i - 2) / 2));
+							Vector2 vector4 = vector3 + (vector2 * (side * dist));
+
+							BodyChunk grabbedChunk = grasp.grabbedChunk;
+							grabbedChunk.vel = player.mainBodyChunk.vel;
+							grabbedChunk.MoveFromOutsideMyUpdate(eu, vector4);
+
+							if (grasp.grabbed is Weapon weapon)
+							{
+								weapon.setRotation = bodyDir;
+								weapon.rotationSpeed = 0f;
+							}
 						}
 
-						// 距离超过期望值时，双方互相拉近
-						if (currentDistance > desiredDistance)
-						{
-							Vector2 selfMove = direction * ((currentDistance - desiredDistance) * massRatio * 0.5f);
-							mainChunk.pos += selfMove;
-							mainChunk.vel += selfMove;
+						//var grasp = player.grasps[i];               // 当前抓取实例
+						//var grabbed = grasp.grabbed;                // 被抓取的对象
+						//var grabbedChunk = grasp.grabbedChunk;      // 被抓取对象的物理块
+						//var mainChunk = player.mainBodyChunk;       // 玩家主身体块
 
-							Vector2 grabbedMove = direction * ((currentDistance - desiredDistance) * (1f - massRatio));
-							grabbedChunk.pos -= grabbedMove;
-							grabbedChunk.vel -= grabbedMove;
-						}
+						//if (grabbed is Player grabbedPlayer && !grabbedPlayer.dead)
+						//{
+						//	Log.LogDebug($"Player");
 
-						// 爬梁时的重力补偿：如果自己在爬梁，而被抓玩家不在爬梁，则给被抓玩家一个向上的速度
-						if (player.bodyMode == Player.BodyModeIndex.ClimbingOnBeam &&
-							player.animation != Player.AnimationIndex.BeamTip && player.animation != Player.AnimationIndex.StandOnBeam &&
-							grabbedPlayer.bodyMode != Player.BodyModeIndex.ClimbingOnBeam)
-						{
-							grabbedChunk.vel.y += grabbed.gravity * (1f - grabbedChunk.submersion) * 0.75f;
-						}
+						//	Vector2 direction = Custom.DirVec(mainChunk.pos, grabbedChunk.pos);
+						//	float currentDistance = Vector2.Distance(mainChunk.pos, grabbedChunk.pos);
+						//	float desiredDistance = 15f;
 
-						// 如果抓取物是“拖拽”类型，且距离过远，则强制释放
-						if (player.Grabability(grabbed) == Player.ObjectGrabability.Drag && currentDistance > (desiredDistance * 2f) + 30f)
-						{
-							player.ReleaseGrasp(i);
-						}
+						//	float massRatio = grabbedChunk.mass / (mainChunk.mass + grabbedChunk.mass);
+
+						//	// 如果正在进入管道（捷径）
+						//	if (player.enteringShortCut != null)
+						//	{
+						//		massRatio = 0f;
+						//	}
+
+						//	// 距离超过期望值时，双方互相拉近
+						//	if (currentDistance > desiredDistance)
+						//	{
+						//		Vector2 selfMove = direction * ((currentDistance - desiredDistance) * massRatio * 0.5f);
+						//		mainChunk.pos += selfMove;
+						//		mainChunk.vel += selfMove;
+
+						//		Vector2 grabbedMove = direction * ((currentDistance - desiredDistance) * (1f - massRatio));
+						//		grabbedChunk.pos -= grabbedMove;
+						//		grabbedChunk.vel -= grabbedMove;
+						//	}
+
+						//	// 爬梁时的重力补偿：如果自己在爬梁，而被抓玩家不在爬梁，则给被抓玩家一个向上的速度
+						//	if (player.bodyMode == Player.BodyModeIndex.ClimbingOnBeam &&
+						//		player.animation != Player.AnimationIndex.BeamTip && player.animation != Player.AnimationIndex.StandOnBeam &&
+						//		grabbedPlayer.bodyMode != Player.BodyModeIndex.ClimbingOnBeam)
+						//	{
+						//		grabbedChunk.vel.y += grabbed.gravity * (1f - grabbedChunk.submersion) * 0.75f;
+						//	}
+
+						//	// 如果抓取物是“拖拽”类型，且距离过远，则强制释放
+						//	if (player.Grabability(grabbed) == Player.ObjectGrabability.Drag && currentDistance > (desiredDistance * 2f) + 30f)
+						//	{
+						//		player.ReleaseGrasp(i);
+						//	}
+						//}
+						//else if (player.HeavyCarry(grabbed))
+						//{
+						//	Log.LogDebug($"player.HeavyCarry(grabbed)");
+
+						//	Vector2 direction = Custom.DirVec(mainChunk.pos, grabbedChunk.pos);
+						//	float currentDistance = Vector2.Distance(mainChunk.pos, grabbedChunk.pos);
+						//	float desiredDistance = 5f + grabbedChunk.rad;
+
+						//	if (grabbed is Cicada)
+						//	{
+						//		desiredDistance = 30f;
+						//	}
+						//	// 根据吃肉进度（eatMeat）在 25 到 15 之间插值缩放期望距离
+						//	desiredDistance *= Mathf.InverseLerp(25f, 15f, player.eatMeat);
+
+						//	// 质量比
+						//	float massRatio = grabbedChunk.mass / (mainChunk.mass + grabbedChunk.mass);
+
+						//	// 进入管道时不拉扯；否则如果物体比玩家轻，质量比减半
+						//	if (player.enteringShortCut != null)
+						//	{
+						//		massRatio = 0f;
+						//	}
+						//	else if (grabbed.TotalMass < player.TotalMass)
+						//	{
+						//		massRatio /= 2f;
+						//	}
+
+						//	// 拉扯条件：不在管道中，或者距离超过期望距离
+						//	if (player.enteringShortCut == null || currentDistance > desiredDistance)
+						//	{
+						//		Vector2 selfMove = direction * ((currentDistance - desiredDistance) * massRatio);
+						//		mainChunk.pos += selfMove;
+						//		mainChunk.vel += selfMove;
+
+						//		Vector2 grabbedMove = direction * ((currentDistance - desiredDistance) * (1f - massRatio));
+						//		grabbedChunk.pos -= grabbedMove;
+						//		grabbedChunk.vel -= grabbedMove;
+						//	}
+						//	if (player.bodyMode == Player.BodyModeIndex.ClimbingOnBeam &&
+						//		player.animation != Player.AnimationIndex.BeamTip && player.animation != Player.AnimationIndex.StandOnBeam)
+						//	{
+						//		grabbedChunk.vel.y += grabbed.gravity * (1f - grabbedChunk.submersion) * 0.75f;
+						//	}
+						//	if (player.Grabability(grabbed) == Player.ObjectGrabability.Drag && currentDistance > (desiredDistance * 2f) + 30f)
+						//	{
+						//		player.ReleaseGrasp(i);
+						//	}
+						//	//grabbedChunk.pos -= new Vector2(0, 0f - (20f * ((i - 2) / 2)));
+						//}
+						//else if (actuallyViewed)
+						//{
+						//	//Log.LogDebug($"actuallyViewed");
+
+						//	int index = i % 2;
+						//	float toward = (index == 0) ? (-1f) : 1f;
+
+						//	//grabbedChunk.MoveFromOutsideMyUpdate(eu, player.mainBodyChunk.pos + new Vector2(10f * toward, 10f));
+
+
+						//	// 手部跟随图形模块的手
+						//	if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics playerGraphics)
+						//	{
+						//		Vector2 anchor = playerGraphics.head.pos + new Vector2(10f * toward, 0f - (15f * ((i - 2) / 2)));
+						//		//Log.LogDebug(i);
+						//		grabbedChunk.MoveFromOutsideMyUpdate(eu, anchor);
+						//		//grabbedChunk.HardSetPosition(anchor);
+
+						//		//grabbedChunk.vel = playerGraphics.hands[i].vel;
+						//		//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[i].pos);
+
+						//		grabbedChunk.vel = playerGraphics.hands[index].vel;
+						//		//grabbedChunk.vel = Vector2.zero;
+						//		//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[index].pos + new Vector2(3 * toward, 3f));
+						//	}
+
+						//	// 如果抓着武器，设置其旋转方向与手一致，并停止旋转
+						//	if (grabbed is Weapon grabbedWeapon)
+						//	{
+						//		Vector2 heldItemDirection = player.GetHeldItemDirection(i);
+						//		grabbedWeapon.setRotation = new Vector2?(heldItemDirection);
+						//		grabbedWeapon.rotationSpeed = 0f;
+						//	}
+						//}
+						//else
+						//{
+						//	Log.LogDebug($"ExtraGrasp: {i} is not actually viewed.");
+
+						//	grabbedChunk.pos = player.bodyChunks[0].pos;
+						//	grabbedChunk.vel = mainChunk.vel;
+						//}
 					}
-					else if (player.HeavyCarry(grabbed))
+					catch (Exception ex)
 					{
-						Log.LogDebug($"player.HeavyCarry(grabbed)");
-
-						Vector2 direction = Custom.DirVec(mainChunk.pos, grabbedChunk.pos);
-						float currentDistance = Vector2.Distance(mainChunk.pos, grabbedChunk.pos);
-						float desiredDistance = 5f + grabbedChunk.rad;
-
-						if (grabbed is Cicada)
-						{
-							desiredDistance = 30f;
-						}
-						// 根据吃肉进度（eatMeat）在 25 到 15 之间插值缩放期望距离
-						desiredDistance *= Mathf.InverseLerp(25f, 15f, player.eatMeat);
-
-						// 质量比
-						float massRatio = grabbedChunk.mass / (mainChunk.mass + grabbedChunk.mass);
-
-						// 进入管道时不拉扯；否则如果物体比玩家轻，质量比减半
-						if (player.enteringShortCut != null)
-						{
-							massRatio = 0f;
-						}
-						else if (grabbed.TotalMass < player.TotalMass)
-						{
-							massRatio /= 2f;
-						}
-
-						// 拉扯条件：不在管道中，或者距离超过期望距离
-						if (player.enteringShortCut == null || currentDistance > desiredDistance)
-						{
-							Vector2 selfMove = direction * ((currentDistance - desiredDistance) * massRatio);
-							mainChunk.pos += selfMove;
-							mainChunk.vel += selfMove;
-
-							Vector2 grabbedMove = direction * ((currentDistance - desiredDistance) * (1f - massRatio));
-							grabbedChunk.pos -= grabbedMove;
-							grabbedChunk.vel -= grabbedMove;
-						}
-						if (player.bodyMode == Player.BodyModeIndex.ClimbingOnBeam &&
-							player.animation != Player.AnimationIndex.BeamTip && player.animation != Player.AnimationIndex.StandOnBeam)
-						{
-							grabbedChunk.vel.y += grabbed.gravity * (1f - grabbedChunk.submersion) * 0.75f;
-						}
-						if (player.Grabability(grabbed) == Player.ObjectGrabability.Drag && currentDistance > (desiredDistance * 2f) + 30f)
-						{
-							player.ReleaseGrasp(i);
-						}
-						//grabbedChunk.pos -= new Vector2(0, 0f - (20f * ((i - 2) / 2)));
-					}
-					else if (actuallyViewed)
-					{
-						//Log.LogDebug($"actuallyViewed");
-
-						int index = i % 2;
-						float toward = (index == 0) ? (-1f) : 1f;
-
-						//grabbedChunk.MoveFromOutsideMyUpdate(eu, player.mainBodyChunk.pos + new Vector2(10f * toward, 10f));
-
-
-						// 手部跟随图形模块的手
-						if (player.graphicsModule != null && player.graphicsModule is PlayerGraphics playerGraphics)
-						{
-							Vector2 anchor = playerGraphics.head.pos + new Vector2(10f * toward, 0f - (15f * ((i - 2) / 2)));
-							//Log.LogDebug(i);
-							grabbedChunk.MoveFromOutsideMyUpdate(eu, anchor);
-							//grabbedChunk.HardSetPosition(anchor);
-
-							//grabbedChunk.vel = playerGraphics.hands[i].vel;
-							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[i].pos);
-
-							grabbedChunk.vel = playerGraphics.hands[index].vel;
-							//grabbedChunk.vel = Vector2.zero;
-							//grabbedChunk.MoveFromOutsideMyUpdate(eu, playerGraphics.hands[index].pos + new Vector2(3 * toward, 3f));
-						}
-
-						// 如果抓着武器，设置其旋转方向与手一致，并停止旋转
-						if (grabbed is Weapon grabbedWeapon)
-						{
-							Vector2 heldItemDirection = player.GetHeldItemDirection(i);
-							grabbedWeapon.setRotation = new Vector2?(heldItemDirection);
-							grabbedWeapon.rotationSpeed = 0f;
-						}
-					}
-					else
-					{
-						Log.LogDebug($"ExtraGrasp: {i} is not actually viewed.");
-
-						grabbedChunk.pos = player.bodyChunks[0].pos;
-						grabbedChunk.vel = mainChunk.vel;
+						Log.LogError($"ExtraGrasp: Error in UpdateGrasps for grasp {i}: {ex}");
 					}
 				}
 			}

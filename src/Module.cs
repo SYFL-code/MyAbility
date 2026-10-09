@@ -135,6 +135,7 @@ namespace MySlugcat
 		public bool CrystalShieldAbility = false;
 		public bool StalwartScute = false;
 		public bool TrackingThrowAbility = false;
+		// 物理纠正!!!
 
 		public CreatureModule(Creature creature) :
 			base(creature)
@@ -147,7 +148,7 @@ namespace MySlugcat
 				{
 					if (player.slugcatStats.name == SlugcatStats.Name.White)
 					{
-						FrameAbility = true;
+						//FrameAbility = true;
 						//ArcLightningAbility = true;
 						//DeflagrationAbility = true;
 						//TrackingThrowAbility = true;
@@ -157,7 +158,7 @@ namespace MySlugcat
 				{
 					//ArcLightningAbility = true;
 				}
-				PenetrationAbility = true;
+				//PenetrationAbility = true;
 				//ArcLightningAbility = true;
 				//CrystalShieldAbility = true;
 				//StalwartScute = true;
