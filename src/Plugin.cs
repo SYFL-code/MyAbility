@@ -5,6 +5,7 @@ using CommonUtils.Core;
 using Fisobs;
 using Fisobs.Core;
 using Fisobs.Items;
+using HarmonyLib;
 using IL;
 using Menu.Remix;
 using Mono.Cecil.Cil;
@@ -64,7 +65,6 @@ public sealed class Plugin : BaseUnityPlugin
 	#endregion
 
 	#region Unity
-
 	public void Awake()// Awake → OnEnable → Start
 	{
 		CommonUtils.Plugin.GUID = Plugin.GUID;
@@ -84,8 +84,9 @@ public sealed class Plugin : BaseUnityPlugin
 	{
 		CommonUtils.Plugin.plugin.Update();
 	}
-
 	#endregion
+
+	public static Harmony? Harmony { get; private set; }
 
 	// 跨 DLL 实例共享的全局键
 	private const string OWNER_KEY = $"{GUID}.ActiveOwner";
@@ -100,33 +101,49 @@ public sealed class Plugin : BaseUnityPlugin
 			return;
 		this.isEnabled = true;
 
-		var owner = AppDomain.CurrentDomain.GetData(OWNER_KEY);
-		if (owner != null && owner is BaseUnityPlugin)
+		try
 		{
-			Log.LogWarning($"检测到重复加载，已有实例活跃，主动销毁自己");
-			isEnabled = false;
-			Destroy(this);
-			return;
+			var owner = AppDomain.CurrentDomain.GetData(OWNER_KEY);
+			if (owner != null && owner is BaseUnityPlugin)
+			{
+				Log.LogWarning($"检测到重复加载，已有实例活跃，主动销毁自己");
+				isEnabled = false;
+				Destroy(this);
+				return;
+			}
+			AppDomain.CurrentDomain.SetData(OWNER_KEY, this);
+			Log.LogInfo("成为活跃实例，开始注册钩子");
+			// OnEnable() with MachineConnector.ReloadConfig() & .SetRegisteredOI()
 		}
-		AppDomain.CurrentDomain.SetData(OWNER_KEY, this);
-		Log.LogInfo("成为活跃实例，开始注册钩子");
-		// OnEnable() with MachineConnector.ReloadConfig() & .SetRegisteredOI()
+		catch (Exception ex)
+		{
+			Log.LogError($"{Plugin.Name} OnEnable检查实例失败 {ex}");
+		}
 
 
 
-		CommonUtils.Plugin.plugin.OnEnable();
+		try
+		{
+			CommonUtils.Plugin.plugin.OnEnable();
 
-		// Put your custom hooks here!-在此放置你自己的钩子
-		On.RainWorld.OnModsInit += On_RainWorld_OnModsInit;
-		On.RainWorld.OnModsEnabled += On_RainWorld_OnModsEnabled;
-		On.RainWorld.OnModsDisabled += On_RainWorld_OnModsDisabled;
+			// Put your custom hooks here!-在此放置你自己的钩子
+			On.RainWorld.OnModsInit += On_RainWorld_OnModsInit;
+			On.RainWorld.OnModsEnabled += On_RainWorld_OnModsEnabled;
+			On.RainWorld.OnModsDisabled += On_RainWorld_OnModsDisabled;
 
-		//PenetrationAbility.Hook();
-		//FrameAbility.Hook();
-		//ArcLightningAbility.Hook();
-		Hooks.RegisterHooks();
+			Plugin.Harmony = new Harmony($"com.{Plugin.Name}");
 
-		CommonUtils.Core.HookManager.Initialize();
+			//PenetrationAbility.Hook();
+			//FrameAbility.Hook();
+			//ArcLightningAbility.Hook();
+			Hooks.RegisterHooks();
+
+			CommonUtils.Core.HookManager.Initialize();
+		}
+		catch (Exception ex)
+		{
+			Log.LogError($"{Plugin.Name} OnEnable {ex}");
+		}
 	}
 
 	public void OnDisable()
@@ -137,23 +154,39 @@ public sealed class Plugin : BaseUnityPlugin
 			return;
 		this.isEnabled = false;
 
-		var owner = AppDomain.CurrentDomain.GetData(OWNER_KEY);
-		if (owner is BaseUnityPlugin baseUnityPlugin && baseUnityPlugin == this)
+		try
 		{
-			Log.LogInfo("活跃实例被卸载，清除所有权");
-			AppDomain.CurrentDomain.SetData(OWNER_KEY, null);
+			var owner = AppDomain.CurrentDomain.GetData(OWNER_KEY);
+			if (owner is BaseUnityPlugin baseUnityPlugin && baseUnityPlugin == this)
+			{
+				Log.LogInfo("活跃实例被卸载，清除所有权");
+				AppDomain.CurrentDomain.SetData(OWNER_KEY, null);
+			}
+		}
+		catch (Exception ex)
+		{
+			Log.LogError($"{Plugin.Name} OnDisable检查实例失败 {ex}");
 		}
 
 
+		try
+		{
+			CommonUtils.Plugin.plugin.OnDisable();
 
-		CommonUtils.Plugin.plugin.OnDisable();
+			// Remove your custom hooks here!-在此取消你的钩子
+			On.RainWorld.OnModsInit -= On_RainWorld_OnModsInit;
+			On.RainWorld.OnModsEnabled -= On_RainWorld_OnModsEnabled;
+			On.RainWorld.OnModsDisabled -= On_RainWorld_OnModsDisabled;
 
-		// Remove your custom hooks here!-在此取消你的钩子
-		On.RainWorld.OnModsInit -= On_RainWorld_OnModsInit;
-		On.RainWorld.OnModsEnabled -= On_RainWorld_OnModsEnabled;
-		On.RainWorld.OnModsDisabled -= On_RainWorld_OnModsDisabled;
+			CommonUtils.Core.HookManager.UnInitializeAll();
 
-		CommonUtils.Core.HookManager.UnInitializeAll();
+			Plugin.Harmony?.UnpatchSelf();
+			Plugin.Harmony = null;
+		}
+		catch (Exception ex)
+		{
+			Log.LogError($"{Plugin.Name} OnDisable {ex}");
+		}
 	}
 
 
@@ -237,4 +270,5 @@ public sealed class Plugin : BaseUnityPlugin
 			Log.LogError("Error registering option interface: ##".Translate.Replace("##", string.Format("{0}", ex)));
 		}
 	}
+
 }

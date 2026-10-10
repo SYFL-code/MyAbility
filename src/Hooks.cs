@@ -8,6 +8,7 @@ using MonoMod.RuntimeDetour;
 using MonoMod.RuntimeDetour.HookGen;
 using MoreSlugcats;
 using MySlugcat.Ability;
+using MySlugcat.Patch;
 using On;
 using RewiredConsts;
 using RWCustom;
@@ -372,6 +373,15 @@ public static class Hooks
 			HookManager.Register(
 				Hook: () => On.Weapon.Thrown += ArcLightning.Weapon_Thrown,
 				UnHook: () => On.Weapon.Thrown -= ArcLightning.Weapon_Thrown
+			);
+		}
+		#endregion
+
+		#region MenuPatch
+		{
+			HookManager.Register(
+				Hook: () => MenuPatch.TryPatch(),
+				UnHook: null
 			);
 		}
 		#endregion
