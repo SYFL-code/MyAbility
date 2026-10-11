@@ -13,6 +13,7 @@ using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
 using MoreSlugcats;
 using MySlugcat.Ability;
+using MySlugcat.Patch;
 using Noise;
 using On;
 using RewiredConsts;
@@ -66,7 +67,7 @@ public sealed class Plugin : BaseUnityPlugin
 	#endregion
 
 	#region Unity
-	public void Awake()// Awake → OnEnable → Start
+	public void Awake()// Awake → OnEnable → Start → Update
 	{
 		CommonUtils.Plugin.GUID = Plugin.GUID;
 		CommonUtils.Plugin.NAME = Plugin.NAME;
@@ -199,8 +200,7 @@ public sealed class Plugin : BaseUnityPlugin
 			// Load any resources, such as sprites or sounds-加载任何资源 包括图像素材和音效
 
 			// Put your custom hooks here!-在此放置你自己的钩子
-
-		}
+        }
 		catch (Exception ex)
 		{
 			Log.LogException(ex);

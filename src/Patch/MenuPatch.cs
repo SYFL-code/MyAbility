@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace MySlugcat.Patch
@@ -12,19 +13,91 @@ namespace MySlugcat.Patch
 	{
 		private static Harmony? _harmony => Plugin.Harmony;
 
+		private static Type? _mmType;   // MouseDrag.MenuManager
+		private static Type? _rmType;   // Critter.UI.RadialMenu
+		private static Type? _rsType;   // Critter.UI.RadialSlot
+		private static Type? _hudType;  // Critter.UI.CritterHud
+		private static Type? _cpType;   // Critter.CritterPlugin
 		public static void TryPatch()
 		{
-			if (_harmony == null)
-				return;
+			if (_harmony == null) return;
 
-			var mmType = AccessTools.TypeByName("MouseDrag.MenuManager");
-			if (mmType == null)
+			FindTypes();   // ← 替换原来的 5 次 TypeByName
+
+			TryPatchRawUpdate();
+			On.RainWorld.Update += DeferredPatch;
+		}
+
+		private static void FindTypes()
+		{
+			Assembly? critterAsm = null;
+			Assembly? mouseDragAsm = null;
+
+			// 只遍历一次程序集列表（几十项），不再遍历所有类型
+			var asms = AppDomain.CurrentDomain.GetAssemblies();
+			for (int i = 0; i < asms.Length; i++)
+			{
+				string name;
+				try { name = asms[i].GetName().Name; }
+				catch { continue; }
+
+				if (name == "Critter") critterAsm = asms[i];
+				else if (name == "MouseDrag") mouseDragAsm = asms[i];
+
+				if (critterAsm != null && mouseDragAsm != null) break;
+			}
+
+			if (critterAsm != null)
+			{
+				_cpType = critterAsm.GetType("Critter.CritterPlugin");
+				_rmType = critterAsm.GetType("Critter.UI.RadialMenu");
+				_rsType = critterAsm.GetType("Critter.UI.RadialSlot");
+				_hudType = critterAsm.GetType("Critter.UI.CritterHud");
+			}
+
+			if (mouseDragAsm != null)
+				_mmType = mouseDragAsm.GetType("MouseDrag.MenuManager");
+
+			// 回退：只有程序集没加载时才走慢路径
+			_cpType ??= AccessTools.TypeByName("Critter.CritterPlugin");
+			_rmType ??= AccessTools.TypeByName("Critter.UI.RadialMenu");
+			_rsType ??= AccessTools.TypeByName("Critter.UI.RadialSlot");
+			_hudType ??= AccessTools.TypeByName("Critter.UI.CritterHud");
+			_mmType ??= AccessTools.TypeByName("MouseDrag.MenuManager");
+
+			Log.LogInfo($"FindTypes: mm={_mmType != null}, cp={_cpType != null}, " +
+						$"rm={_rmType != null}, rs={_rsType != null}, hud={_hudType != null}");
+		}
+
+		private static bool _deferredDone;
+
+		private static void DeferredPatch(On.RainWorld.orig_Update orig, RainWorld self)
+		{
+			orig(self);
+
+			if (_deferredDone) return;
+			_deferredDone = true;
+			On.RainWorld.Update -= DeferredPatch;
+
+			try
+			{
+				TryPatchAnimations();
+				TryPatchTooltip();
+			}
+			catch (Exception ex)
+			{
+				Log.LogError("DeferredPatch failed: " + ex);
+			}
+		}
+		private static void TryPatchRawUpdate()
+		{
+			if (_harmony == null || _mmType == null)
 			{
 				Log.LogWarning("MouseDrag.MenuManager not found, patch skipped");
 				return;
 			}
 
-			var rawUpdate = AccessTools.Method(mmType, "RawUpdate");
+			var rawUpdate = AccessTools.Method(_mmType, "RawUpdate");
 			if (rawUpdate == null)
 			{
 				Log.LogWarning("MouseDrag.MenuManager.RawUpdate not found");
@@ -34,17 +107,14 @@ namespace MySlugcat.Patch
 			try
 			{
 				_harmony.Patch(rawUpdate,
-					prefix: new HarmonyMethod(AccessTools.Method(typeof(MenuPatch), nameof(Prefix_RawUpdate)))
-					);
+					prefix: new HarmonyMethod(AccessTools.Method(
+						typeof(MenuPatch), nameof(Prefix_RawUpdate))));
 				Log.LogInfo("Patched MouseDrag.MenuManager.RawUpdate");
 			}
 			catch (Exception ex)
 			{
 				Log.LogError("Patch RawUpdate failed: " + ex);
 			}
-
-			TryPatchAnimations();
-			TryPatchTooltip();
 		}
 
 
@@ -55,19 +125,15 @@ namespace MySlugcat.Patch
 		public static void TryPatchAnimations()
 		{
 			if (_harmony == null) return;
-
-			var radialMenu = AccessTools.TypeByName("Critter.UI.RadialMenu");
-			var radialSlot = AccessTools.TypeByName("Critter.UI.RadialSlot");
-
-			if (radialMenu == null || radialSlot == null)
+			if (_rmType == null || _rsType == null)
 			{
 				Log.LogWarning("Critter.UI types not found, animation patch skipped");
 				return;
 			}
-
-			TryPatchLerps(radialMenu, "Update");
-			TryPatchLerps(radialSlot, "UpdateMesh");
+			TryPatchLerps(_rmType, "Update");
+			TryPatchLerps(_rsType, "UpdateMesh");
 		}
+
 
 		private static void TryPatchLerps(Type type, string methodName)
 		{
@@ -127,15 +193,13 @@ namespace MySlugcat.Patch
 		public static void TryPatchTooltip()
 		{
 			if (_harmony == null) return;
-
-			var hudType = AccessTools.TypeByName("Critter.UI.CritterHud");
-			if (hudType == null)
+			if (_hudType == null)
 			{
 				Log.LogWarning("CritterHud not found, tooltip patch skipped");
 				return;
 			}
 
-			var method = AccessTools.Method(hudType, "UpdateTooltip");
+			var method = AccessTools.Method(_hudType, "UpdateTooltip");
 			if (method == null)
 			{
 				Log.LogWarning("CritterHud.UpdateTooltip not found");
@@ -145,8 +209,8 @@ namespace MySlugcat.Patch
 			try
 			{
 				_harmony.Patch(method,
-					postfix: new HarmonyMethod(AccessTools.Method(typeof(MenuPatch), nameof(Postfix_UpdateTooltip)))
-					);
+					postfix: new HarmonyMethod(AccessTools.Method(
+						typeof(MenuPatch), nameof(Postfix_UpdateTooltip))));
 				Log.LogInfo("Patched CritterHud.UpdateTooltip");
 			}
 			catch (Exception ex)
@@ -156,6 +220,8 @@ namespace MySlugcat.Patch
 		}
 
 
+		private static bool _tooltipWarmed;
+
 		public static void Postfix_UpdateTooltip(object __instance)
 		{
 			try
@@ -163,13 +229,20 @@ namespace MySlugcat.Patch
 				EnsureTooltipCache();
 				if (__instance == null) return;
 
+				if (!_tooltipWarmed)
+				{
+					_tooltipWarmed = true;
+
+					// 顺便把 _sprites 的 FieldInfo 也建好，避免下一帧再反射
+					var b = _tooltipBoxF?.GetValue(__instance);
+					if (b != null)
+						_vanillaBoxSpritesF = AccessTools.Field(b.GetType(), "_sprites");
+
+					return;   // 这一帧不做事，只做 JIT 预热
+				}
+
 				var box = _tooltipBoxF?.GetValue(__instance);
 				var label = _tooltipLabelF?.GetValue(__instance) as FLabel;
-
-				if (label != null && box != null && label.isVisible && !string.IsNullOrEmpty(label.text))
-				{
-
-				}
 
 				try { MoveVanillaBoxToFront(box); } catch { }
 				try { label?.MoveToFront(); } catch { }
@@ -177,48 +250,35 @@ namespace MySlugcat.Patch
 			catch { }
 		}
 
-		private static FieldInfo? _tooltipBoxSpritesF;
-		private static MethodInfo? _tooltipBoxDrawM;
 		private static FieldInfo? _tooltipBoxF;
 		private static FieldInfo? _tooltipLabelF;
 
 		private static void EnsureTooltipCache()
 		{
 			if (_tooltipBoxF != null && _tooltipLabelF != null) return;
-			var hudType = AccessTools.TypeByName("Critter.UI.CritterHud");
-			if (hudType == null) return;
-			_tooltipBoxF = AccessTools.Field(hudType, "_tooltipBox");
-			_tooltipLabelF = AccessTools.Field(hudType, "_tooltipLabel");
+			if (_hudType == null) return;
+			_tooltipBoxF = AccessTools.Field(_hudType, "_tooltipBox");
+			_tooltipLabelF = AccessTools.Field(_hudType, "_tooltipLabel");
 		}
+
+		private static FieldInfo? _vanillaBoxSpritesF;
 
 		private static void MoveVanillaBoxToFront(object? box)
 		{
 			if (box == null) return;
 
-			var spritesField = AccessTools.Field(box.GetType(), "_sprites");
-			if (spritesField == null) return;
-
-			var sprites = spritesField.GetValue(box) as Array;
-			if (sprites == null) return;
-
-			// ---- 修复主填充与侧填充的亚像素缝隙 ----
-			// 关键：扩边量要 ≥ 2px，保证 overlap 至少覆盖 1 个完整像素，
-			// 不会因为「扩边后边缘又落在 .5 上」而重新贴边。
-			//if (sprites.Length > 8 && sprites.GetValue(8) is FSprite mainFill)
-			//{
-			//	const float Expand = 2f;
-			//	mainFill.x -= Expand;
-			//	mainFill.y -= Expand;
-			//	mainFill.scaleX += Expand * 2f;
-			//	mainFill.scaleY += Expand * 2f;
-			//}
-
-			// 顺序遍历，把每个 sprite 移到父容器最末，保持内部绘制顺序
-			for (int i = 0; i < sprites.Length; i++)
+			// 只反射查一次 _sprites 字段
+			if (_vanillaBoxSpritesF == null)
 			{
+				_vanillaBoxSpritesF = AccessTools.Field(box.GetType(), "_sprites");
+				if (_vanillaBoxSpritesF == null) return;
+			}
+
+			if (_vanillaBoxSpritesF.GetValue(box) is not Array sprites) return;
+
+			for (int i = 0; i < sprites.Length; i++)
 				if (sprites.GetValue(i) is FNode sprite)
 					sprite.MoveToFront();
-			}
 		}
 
 
@@ -279,30 +339,22 @@ namespace MySlugcat.Patch
 		private static void EnsureCache()
 		{
 			if (_cached) return;
+			if (_cpType == null) return;
+
 			try
 			{
-				var pluginType = AccessTools.TypeByName("Critter.CritterPlugin");
-				if (pluginType == null)
-				{
-					Log.LogWarning("Critter.CritterPlugin not found yet, will retry");
-					return;
-				}
-
-				var instanceProp = AccessTools.Property(pluginType, "Instance");
-				var isMenuOpenF = AccessTools.Field(pluginType, "_isMenuOpen");
+				var instanceProp = AccessTools.Property(_cpType, "Instance");
+				var isMenuOpenF = AccessTools.Field(_cpType, "_isMenuOpen");
 
 				if (instanceProp == null || isMenuOpenF == null)
 				{
 					Log.LogWarning("Critter fields missing, will retry later");
-					return;   // 不置 _cached
+					return;
 				}
 
-
-				// 全部成功才提交
-				_pluginType = pluginType;
+				_pluginType = _cpType;
 				_instanceProp = instanceProp;
 				_isMenuOpenF = isMenuOpenF;
-
 				_cached = true;
 				Log.LogInfo("MenuPatch cache built");
 			}
