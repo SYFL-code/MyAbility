@@ -62,6 +62,7 @@ public sealed class Plugin : BaseUnityPlugin
 	private const bool EnableStartScreen = true;
 	public const bool ForceLog = false;
 #endif
+
 	#endregion
 
 	#region Unity
@@ -121,7 +122,6 @@ public sealed class Plugin : BaseUnityPlugin
 		}
 
 
-
 		try
 		{
 			CommonUtils.Plugin.plugin.OnEnable();
@@ -133,11 +133,7 @@ public sealed class Plugin : BaseUnityPlugin
 
 			Plugin.Harmony = new Harmony($"com.{Plugin.Name}");
 
-			//PenetrationAbility.Hook();
-			//FrameAbility.Hook();
-			//ArcLightningAbility.Hook();
 			Hooks.RegisterHooks();
-
 			CommonUtils.Core.HookManager.Initialize();
 		}
 		catch (Exception ex)

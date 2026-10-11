@@ -294,53 +294,20 @@ public static class Hooks
 		#endregion
 
 		#region Camouflage
-		HookManager.Register(
+		{
+			HookManager.Register(
 				Hook: () => On.Player.Update += Camouflage.Player_Update,
 				UnHook: () => On.Player.Update -= Camouflage.Player_Update
 			);
-		HookManager.Register(
-				Hook: () => On.Player.ThrowObject += Camouflage.Player_ThrowObject,
-				UnHook: () => On.Player.ThrowObject -= Camouflage.Player_ThrowObject
-			);
+			HookManager.Register(
+					Hook: () => On.Player.ThrowObject += Camouflage.Player_ThrowObject,
+					UnHook: () => On.Player.ThrowObject -= Camouflage.Player_ThrowObject
+				);
 			HookManager.Register(
 				Hook: () => On.PlayerGraphics.DrawSprites += Camouflage.PlayerGraphics_DrawSprites,
 				UnHook: () => On.PlayerGraphics.DrawSprites -= Camouflage.PlayerGraphics_DrawSprites
 			);
-
-		//Harmony.CreateAndPatchAll(typeof(Camouflage.Patch_VisibilityBonus));
-		//Harmony.Patch(AccessTools.Method("命名空间.类名称.方法名称"), prefix: new HarmonyMethod(typeof(钩子方法的类), nameof(钩子方法的名称)));
-
-
-		//MethodInfo target = typeof(Player).GetProperty("VisibilityBonus", BindingFlags.Public | BindingFlags.Instance).GetGetMethod();
-		//if (target != null)
-		//{
-		//	var hook = new Hook(
-		//		target,
-		//		new Func<Func<Player, float>, Player, float>((orig, self) =>
-		//		{
-		//			// 先执行原始方法（等价于 Prefix + Original）
-		//			float result = orig(self);
-
-		//			// Postfix 逻辑
-		//			try
-		//			{
-		//				self.GetModule(out var module);
-		//				if (module.CamouflageAbility)
-		//				{
-		//					float visibility = (ColorHelper.Lerp(module.whitePickUpColor, self.ShortCutColor(), module.whiteCamoColor) * 2f) - 0.8f;
-		//					Log.LogInfo($"__result:{result}, visibility:{visibility}");
-		//					result = Mathf.Min(result, visibility);
-		//				}
-		//			}
-		//			catch (Exception e)
-		//			{
-		//				Log.LogError($"[MonoMod] VisibilityBonus 补丁出错: {e.Message}");
-		//			}
-
-		//			return result;
-		//		})
-		//	);
-		//}
+		}
 		#endregion
 
 		#region ArcLightning
@@ -353,19 +320,6 @@ public static class Hooks
 				Hook: () => On.Lizard.Bite += ArcLightning.Lizard_Bite,
 				UnHook: () => On.Lizard.Bite -= ArcLightning.Lizard_Bite
 			);
-			//HookManager.Register(
-			//	Hook: () => On.Weapon.HitSomething += ArcLightning.ArcLightning_HitSomething,
-			//	UnHook: () => On.Weapon.HitSomething -= ArcLightning.ArcLightning_HitSomething
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.Spear.HitSomething += ArcLightning.ArcLightning_HitSomething,
-			//	UnHook: () => On.Spear.HitSomething -= ArcLightning.ArcLightning_HitSomething
-			//);
-			//HookManager.Register(
-			//	Hook: () => On.Rock.HitSomething += ArcLightning.ArcLightning_HitSomething,
-			//	UnHook: () => On.Rock.HitSomething -= ArcLightning.ArcLightning_HitSomething
-			//);
-
 			HookManager.Register(
 				Hook: () => On.Creature.Update += ArcLightning.Creature_Update,
 				UnHook: () => On.Creature.Update -= ArcLightning.Creature_Update
@@ -389,12 +343,7 @@ public static class Hooks
 
 		try
 		{
-			//Scrap.Zname.OnEnable();
 
-			// 创建同一个 Harmony 实例，一次性 Patch 所有类
-			//Harmony harmony = new Harmony("com.test.id");
-			// 这会自动扫描当前程序集，并按优先级排序所有补丁
-			//harmony.PatchAll();
 		}
 		catch (Exception ex)
 		{
