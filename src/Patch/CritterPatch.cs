@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace MySlugcat.Patch
 {
-	public static class MenuPatch
+	public static class CritterPatch
 	{
 		private static Harmony? _harmony => Plugin.Harmony;
 
@@ -82,7 +82,6 @@ namespace MySlugcat.Patch
 			try
 			{
 				TryPatchAnimations();
-				TryPatchTooltip();
 			}
 			catch (Exception ex)
 			{
@@ -108,7 +107,7 @@ namespace MySlugcat.Patch
 			{
 				_harmony.Patch(rawUpdate,
 					prefix: new HarmonyMethod(AccessTools.Method(
-						typeof(MenuPatch), nameof(Prefix_RawUpdate))));
+						typeof(CritterPatch), nameof(Prefix_RawUpdate))));
 				Log.LogInfo("Patched MouseDrag.MenuManager.RawUpdate");
 			}
 			catch (Exception ex)
@@ -151,7 +150,7 @@ namespace MySlugcat.Patch
 			try
 			{
 				_harmony.Patch(method,
-					transpiler: new HarmonyMethod(AccessTools.Method(typeof(MenuPatch), nameof(Transpiler_AccelerateLerps)))
+					transpiler: new HarmonyMethod(AccessTools.Method(typeof(CritterPatch), nameof(Transpiler_AccelerateLerps)))
 					);
 				Log.LogInfo($"Patched {type.Name}.{methodName} (lerp transpiler)");
 			}
@@ -188,98 +187,6 @@ namespace MySlugcat.Patch
 			return codes;
 		}
 
-
-		// ---- 提示框置顶 ----
-		public static void TryPatchTooltip()
-		{
-			if (_harmony == null) return;
-			if (_hudType == null)
-			{
-				Log.LogWarning("CritterHud not found, tooltip patch skipped");
-				return;
-			}
-
-			var method = AccessTools.Method(_hudType, "UpdateTooltip");
-			if (method == null)
-			{
-				Log.LogWarning("CritterHud.UpdateTooltip not found");
-				return;
-			}
-
-			try
-			{
-				_harmony.Patch(method,
-					postfix: new HarmonyMethod(AccessTools.Method(
-						typeof(MenuPatch), nameof(Postfix_UpdateTooltip))));
-				Log.LogInfo("Patched CritterHud.UpdateTooltip");
-			}
-			catch (Exception ex)
-			{
-				Log.LogError("Patch UpdateTooltip failed: " + ex);
-			}
-		}
-
-
-		private static bool _tooltipWarmed;
-
-		public static void Postfix_UpdateTooltip(object __instance)
-		{
-			try
-			{
-				EnsureTooltipCache();
-				if (__instance == null) return;
-
-				if (!_tooltipWarmed)
-				{
-					_tooltipWarmed = true;
-
-					// 顺便把 _sprites 的 FieldInfo 也建好，避免下一帧再反射
-					var b = _tooltipBoxF?.GetValue(__instance);
-					if (b != null)
-						_vanillaBoxSpritesF = AccessTools.Field(b.GetType(), "_sprites");
-
-					return;   // 这一帧不做事，只做 JIT 预热
-				}
-
-				var box = _tooltipBoxF?.GetValue(__instance);
-				var label = _tooltipLabelF?.GetValue(__instance) as FLabel;
-
-				try { MoveVanillaBoxToFront(box); } catch { }
-				try { label?.MoveToFront(); } catch { }
-			}
-			catch { }
-		}
-
-		private static FieldInfo? _tooltipBoxF;
-		private static FieldInfo? _tooltipLabelF;
-
-		private static void EnsureTooltipCache()
-		{
-			if (_tooltipBoxF != null && _tooltipLabelF != null) return;
-			if (_hudType == null) return;
-			_tooltipBoxF = AccessTools.Field(_hudType, "_tooltipBox");
-			_tooltipLabelF = AccessTools.Field(_hudType, "_tooltipLabel");
-		}
-
-		private static FieldInfo? _vanillaBoxSpritesF;
-
-		private static void MoveVanillaBoxToFront(object? box)
-		{
-			if (box == null) return;
-
-			// 只反射查一次 _sprites 字段
-			if (_vanillaBoxSpritesF == null)
-			{
-				_vanillaBoxSpritesF = AccessTools.Field(box.GetType(), "_sprites");
-				if (_vanillaBoxSpritesF == null) return;
-			}
-
-			if (_vanillaBoxSpritesF.GetValue(box) is not Array sprites) return;
-
-			for (int i = 0; i < sprites.Length; i++)
-				if (sprites.GetValue(i) is FNode sprite)
-					sprite.MoveToFront();
-		}
 
 
 		// ---- 菜单关闭后拦截鼠标拖拽 ----
@@ -319,7 +226,6 @@ namespace MySlugcat.Patch
 		private static bool CritterMenuOpen()
 		{
 			EnsureCache();
-			if (_pluginType == null) return false;
 
 			var inst = _instanceProp?.GetValue(null);
 			if (inst == null) return false;
@@ -331,7 +237,6 @@ namespace MySlugcat.Patch
 
 		// ---- 缓存 ----
 		private static bool _cached;
-		private static Type? _pluginType;
 		private static PropertyInfo? _instanceProp;
 
 		private static FieldInfo? _isMenuOpenF;
@@ -352,7 +257,6 @@ namespace MySlugcat.Patch
 					return;
 				}
 
-				_pluginType = _cpType;
 				_instanceProp = instanceProp;
 				_isMenuOpenF = isMenuOpenF;
 				_cached = true;

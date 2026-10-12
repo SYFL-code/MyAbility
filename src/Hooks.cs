@@ -331,14 +331,24 @@ public static class Hooks
 		}
 		#endregion
 
-		#region MenuPatch
+		#region CritterPatch
 		{
 			HookManager.Register(
-				Hook: () => MenuPatch.TryPatch(),
+				Hook: () => CritterPatch.TryPatch(),
 				UnHook: null
 			);
 		}
 		#endregion
+
+		#region RemixAutoRestart
+		{
+			HookManager.Register(
+				Hook: () => UpdatableManager.Register(RemixAutoRestart.Instance),
+				UnHook: null
+			);
+		}
+		#endregion
+
 
 
 		try
